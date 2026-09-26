@@ -288,6 +288,12 @@ body{display:flex}
   <div class="btn-row">
     <button id="captureBtn" class="secondary" disabled>📷 Capture &amp; Send</button>
   </div>
+  <div class="btn-row" id="idleRow">
+    <label for="idleMinutes" style="font-size:0.72rem;color:#999;">Idle stop:</label>
+    <input type="number" id="idleMinutes" min="1" max="60" value="3" style="width:48px;background:#1c1c1c;color:#eee;border:1px solid #333;border-radius:4px;padding:4px;font-size:0.72rem;">
+    <span style="font-size:0.72rem;color:#999;">min</span>
+    <span id="idleCountdown" style="font-size:0.72rem;color:#6fa8ff;margin-left:auto;"></span>
+  </div>
   <div id="camStatus">Not started yet.</div>
   <div id="deviceList"></div>
   <div id="camGrid"></div>
@@ -1657,12 +1663,47 @@ requestAnimationFrame(raf);
   const deviceListEl = document.getElementById('deviceList');
   const camGrid = document.getElementById('camGrid');
   const captureCanvas = document.getElementById('captureCanvas');
+  const idleMinutesEl = document.getElementById('idleMinutes');
+  const idleCountdownEl = document.getElementById('idleCountdown');
 
   let detectedDevices = [];
   let activeStreams = [];
   let activeFeeds = [];
+  let lastActivity = Date.now();
+  let idleStopped = false;
 
   function log(msg){ statusEl.textContent = msg; }
+
+  function bumpActivity(){
+    lastActivity = Date.now();
+    idleStopped = false;
+  }
+
+  function idleLimitMs(){
+    const mins = Math.max(1, parseFloat(idleMinutesEl.value) || 3);
+    return mins * 60 * 1000;
+  }
+
+  // Releases the camera hardware (same effect as closing the tab/refreshing)
+  // without forgetting which devices were detected/selected, so resuming
+  // just re-opens streams for the same checked boxes — no re-detect, no new
+  // permission prompt.
+  function idleStopCameras(){
+    if(!activeFeeds.length || idleStopped) return;
+    stopAllActiveStreams();
+    activeFeeds.forEach(f => { f.video.srcObject = null; });
+    activeFeeds = [];
+    captureBtn.disabled = true;
+    idleStopped = true;
+    log('Idle timeout — cameras released to cool down. Click "Start Selected" to resume (no re-detect needed).');
+  }
+
+  setInterval(() => {
+    if(!activeStreams.length || idleStopped){ idleCountdownEl.textContent = ''; return; }
+    const remain = idleLimitMs() - (Date.now() - lastActivity);
+    if(remain <= 0){ idleStopCameras(); return; }
+    idleCountdownEl.textContent = 'idle in ' + Math.ceil(remain/1000) + 's';
+  }, 1000);
 
   function stopAllActiveStreams(){
     activeStreams.forEach(s => s.getTracks().forEach(t => t.stop()));
@@ -1702,6 +1743,7 @@ requestAnimationFrame(raf);
   }
 
   async function startSelected(){
+    bumpActivity();
     startBtn.disabled = true; detectBtn.disabled = true;
     stopAllActiveStreams();
     camGrid.innerHTML = '';
@@ -1782,6 +1824,7 @@ requestAnimationFrame(raf);
 
   async function captureAll(){
     if(!activeFeeds.length) return;
+    bumpActivity();
     captureBtn.disabled = true;
     log('Capturing '+activeFeeds.length+' photo(s)...');
 
