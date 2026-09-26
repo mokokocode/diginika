@@ -1740,8 +1740,8 @@ requestAnimationFrame(raf);
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             deviceId: { exact: dev.deviceId },
-            width: { ideal: 320 }, height: { ideal: 240 },
-            frameRate: { ideal: 15, max: 15 }
+            width: { ideal: 4096 }, height: { ideal: 2160 },
+            frameRate: { ideal: 15 }
           },
           audio: false
         });
