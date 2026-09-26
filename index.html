@@ -1,328 +1,1819 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>USB Camera Feed Test</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wigglegram Bench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
-  :root { color-scheme: dark; }
-  body {
-    margin: 0;
-    background: #111;
-    color: #eee;
-    font-family: -apple-system, system-ui, sans-serif;
-    padding: 16px;
-  }
-  h1 { font-size: 1.1rem; margin: 0 0 4px; }
-  p.sub { margin: 0 0 16px; color: #999; font-size: 0.85rem; }
-  #status {
-    margin-bottom: 16px;
-    padding: 10px 12px;
-    background: #1c1c1c;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    line-height: 1.4;
-    white-space: pre-wrap;
-  }
-  #deviceList {
-    display: none;
-    background: #1c1c1c;
-    border-radius: 8px;
-    padding: 10px 12px;
-    margin-bottom: 16px;
-  }
-  #deviceList.visible { display: block; }
-  .device-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 0;
-    font-size: 0.85rem;
-    border-bottom: 1px solid #2a2a2a;
-  }
-  .device-row:last-child { border-bottom: none; }
-  .device-row input { width: 16px; height: 16px; }
-  #grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-  @media (min-width: 700px) {
-    #grid { grid-template-columns: 1fr 1fr; }
-  }
-  .cam-box {
-    background: #1c1c1c;
-    border-radius: 10px;
-    overflow: hidden;
-    border: 1px solid #333;
-  }
-  .cam-label {
-    padding: 6px 10px;
-    font-size: 0.8rem;
-    color: #bbb;
-    border-bottom: 1px solid #333;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-  }
-  .cam-label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  video {
-    width: 100%;
-    display: block;
-    background: #000;
-    aspect-ratio: 4/3;
-    object-fit: contain;
-  }
-  .cam-controls {
-    display: flex;
-    gap: 8px;
-    padding: 8px 10px;
-    align-items: center;
-  }
-  .cam-controls button {
-    margin: 0;
-    padding: 6px 12px;
-    font-size: 0.8rem;
-  }
-  .thumb-wrap {
-    padding: 0 10px 10px;
-    display: none;
-  }
-  .thumb-wrap.visible { display: flex; gap: 8px; align-items: center; }
-  .thumb-wrap img {
-    width: 64px;
-    height: 48px;
-    object-fit: cover;
-    border-radius: 4px;
-    border: 1px solid #333;
-  }
-  .thumb-wrap a {
-    color: #6fa8ff;
-    font-size: 0.8rem;
-    text-decoration: none;
-  }
-  .thumb-wrap a:hover { text-decoration: underline; }
-  button {
-    background: #2d7dff;
-    color: white;
-    border: none;
-    padding: 10px 18px;
-    border-radius: 8px;
-    font-size: 0.95rem;
-    margin-bottom: 16px;
-    cursor: pointer;
-  }
-  button:disabled { background: #444; cursor: default; }
-  button.secondary { background: #333; }
-  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+:root{
+  --yellow:#FDC800;
+  --violet:#432DD7;
+  --success:#16A34A;
+  --warn:#D97706;
+  --danger:#DC2626;
+  --surface:#FBFBF9;
+  --ink:#1C293C;
+  --gray:#C9C7C0;
+  --sh:4px 4px 0px var(--ink);
+  --sh-lift:6px 6px 0px var(--ink);
+  --sh-flat:0px 0px 0px var(--ink);
+  --sans:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--surface);color:var(--ink);
+  font-family:var(--sans);font-size:15px;line-height:1.45;font-weight:500;
+  -webkit-font-smoothing:antialiased;overflow:hidden;
+}
+button,input,select,label{font:inherit;color:inherit}
+
+/* ---------- shell ---------- */
+.app{display:grid;grid-template-rows:auto 1fr auto;height:100%}
+.topbar{
+  display:flex;align-items:center;gap:12px;padding:12px 16px;
+  border-bottom:3px solid var(--ink);background:var(--yellow);
+}
+.brand{display:flex;align-items:center;gap:12px;margin-right:auto;min-width:0}
+.brand b{font-weight:900;letter-spacing:-.01em;font-size:21px;white-space:nowrap}
+.brand span{
+  font-family:var(--mono);font-size:13px;font-weight:500;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;
+  border:2px solid var(--ink);background:var(--surface);padding:2px 8px
+}
+
+.middle{display:grid;grid-template-columns:1fr 312px;min-height:0}
+.stagewrap{position:relative;min-width:0;display:grid;grid-template-rows:auto 1fr}
+.tabs{display:flex;gap:8px;padding:12px 16px;border-bottom:3px solid var(--ink);background:var(--surface)}
+.tab{
+  background:var(--surface);border:3px solid var(--ink);padding:8px 16px;cursor:pointer;
+  font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;
+  box-shadow:var(--sh);transform:translate(0,0);
+  transition:transform 100ms ease,box-shadow 100ms ease;
+}
+.tab:hover{transform:translate(-2px,-2px);box-shadow:var(--sh-lift)}
+.tab:active{transform:translate(2px,2px);box-shadow:var(--sh-flat)}
+.tab[aria-selected="true"]{background:var(--violet);color:var(--surface)}
+.tabhint{
+  margin-left:auto;align-self:center;font-family:var(--mono);font-size:13px;font-weight:500
+}
+
+.stage{position:relative;background:var(--surface);min-height:0;overflow:hidden;
+  background-image:radial-gradient(var(--gray) 1.5px, transparent 1.5px);
+  background-size:16px 16px}
+#stage{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+#stage.dragging{cursor:grabbing}
+#stage.panready{cursor:grab}
+#stage.panning{cursor:grabbing}
+#stage.picking{cursor:crosshair}
+
+.zoombar{
+  position:absolute;left:16px;bottom:16px;z-index:5;display:flex;
+  background:var(--surface);border:3px solid var(--ink);box-shadow:var(--sh)
+}
+.zoombar.hide{display:none}
+.zb{
+  background:var(--surface);border:0;border-right:3px solid var(--ink);padding:8px 12px;cursor:pointer;
+  font-family:var(--mono);font-size:13px;font-weight:700;line-height:1
+}
+.zb:last-child{border-right:0}
+.zb:hover{background:var(--yellow)}
+.zb:active{background:var(--violet);color:var(--surface)}
+.zb.lbl{min-width:64px}
+
+.empty{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  padding:24px;pointer-events:none
+}
+.empty.on{pointer-events:auto}
+.empty h2{font-size:27px;font-weight:900;margin:0 0 12px;letter-spacing:-.02em}
+.empty p{max-width:44ch;margin:0;font-size:15px;line-height:1.5}
+.drop{
+  border:3px solid var(--ink);background:var(--surface);box-shadow:var(--sh);
+  padding:32px;cursor:pointer;display:block;text-align:center;
+  transform:translate(0,0);transition:transform 100ms ease,box-shadow 100ms ease
+}
+.drop:hover{transform:translate(-2px,-2px);box-shadow:var(--sh-lift)}
+.drop:active{transform:translate(2px,2px);box-shadow:var(--sh-flat)}
+.drop.hot{background:var(--yellow);transform:translate(-2px,-2px);box-shadow:var(--sh-lift)}
+.drop .cue{
+  margin-top:16px;font-family:var(--mono);font-size:13px;font-weight:700;
+  background:var(--violet);color:var(--surface);border:2px solid var(--ink);
+  display:inline-block;padding:4px 12px
+}
+
+/* ---------- side panel ---------- */
+.side{border-left:3px solid var(--ink);background:var(--surface);overflow-y:auto;overflow-x:hidden}
+.sect{border-bottom:3px solid var(--ink);padding:16px}
+.sect h3{
+  margin:0 0 12px;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.02em;
+  background:var(--ink);color:var(--surface);padding:4px 8px;display:inline-block
+}
+.row{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.row:last-child{margin-bottom:0}
+.row label{font-size:13px;font-weight:700;flex:none;width:76px}
+.grow{flex:1;min-width:0}
+.val{
+  font-family:var(--mono);font-size:13px;font-weight:700;min-width:52px;text-align:right;
+  border:2px solid var(--ink);padding:2px 4px;background:var(--surface)
+}
+
+input[type=range]{-webkit-appearance:none;appearance:none;background:none;height:24px;flex:1;min-width:0}
+input[type=range]::-webkit-slider-runnable-track{height:8px;background:var(--surface);border:2px solid var(--ink)}
+input[type=range]::-moz-range-track{height:8px;background:var(--surface);border:2px solid var(--ink)}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:16px;height:16px;background:var(--yellow);
+  border:2px solid var(--ink);margin-top:-6px;cursor:pointer}
+input[type=range]::-moz-range-thumb{
+  width:16px;height:16px;background:var(--yellow);border:2px solid var(--ink);
+  border-radius:0;cursor:pointer}
+input[type=range]:focus-visible{outline:3px solid var(--violet);outline-offset:2px}
+
+input[type=number],input[type=text],select{
+  background:var(--surface);border:3px solid var(--ink);padding:8px 8px;
+  font-family:var(--mono);font-size:13px;font-weight:700;min-width:0;width:100%;border-radius:0
+}
+input[type=number]:focus,input[type=text]:focus,select:focus{box-shadow:var(--sh)}
+input[type=color]{
+  -webkit-appearance:none;appearance:none;border:3px solid var(--ink);
+  width:40px;height:32px;padding:2px;background:var(--surface);cursor:pointer;border-radius:0
+}
+input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+input[type=color]::-webkit-color-swatch{border:none}
+input:focus-visible,select:focus-visible,button:focus-visible,label.btn:focus-visible,.cell:focus-visible{
+  outline:3px solid var(--violet);outline-offset:2px}
+
+.btn{
+  background:var(--surface);border:3px solid var(--ink);padding:8px 12px;cursor:pointer;
+  font-size:13px;font-weight:800;text-transform:uppercase;white-space:nowrap;
+  box-shadow:var(--sh);transform:translate(0,0);
+  transition:transform 100ms ease,box-shadow 100ms ease;border-radius:0
+}
+.btn:hover{transform:translate(-2px,-2px);box-shadow:var(--sh-lift)}
+.btn:active{transform:translate(2px,2px);box-shadow:var(--sh-flat)}
+.btn.on{background:var(--violet);color:var(--surface)}
+.btn.go{background:var(--yellow)}
+.btn:disabled{background:var(--gray);color:#5b6470;box-shadow:var(--sh-flat);
+  transform:none;cursor:not-allowed}
+.btn.sm{padding:4px 8px;font-size:13px}
+label.btn{display:inline-block}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.seg{display:flex;border:3px solid var(--ink);flex:1;box-shadow:var(--sh)}
+.seg button{
+  flex:1;background:var(--surface);border:0;border-right:3px solid var(--ink);padding:8px 4px;
+  cursor:pointer;font-size:13px;font-weight:800;text-transform:uppercase}
+.seg button:last-child{border-right:0}
+.seg button:hover{background:var(--yellow)}
+.seg button[aria-pressed="true"]{background:var(--violet);color:var(--surface)}
+.note{
+  font-size:13px;line-height:1.5;margin:12px 0 0;
+  border-left:8px solid var(--violet);border-top:2px solid var(--ink);
+  border-right:2px solid var(--ink);border-bottom:2px solid var(--ink);
+  padding:8px 12px;background:var(--surface)}
+.hide{display:none !important}
+.vh{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+
+/* ---------- filmstrip ---------- */
+.strip{background:var(--surface);border-top:3px solid var(--ink);padding:12px 16px}
+.cells{display:flex;gap:16px;overflow-x:auto;padding:4px 4px 8px}
+.cell{
+  position:relative;flex:none;width:120px;border:3px solid var(--ink);
+  background:var(--surface);cursor:pointer;box-shadow:var(--sh);
+  transform:translate(0,0);transition:transform 100ms ease,box-shadow 100ms ease}
+.cell:hover{transform:translate(-2px,-2px);box-shadow:var(--sh-lift)}
+.cell:active{transform:translate(2px,2px);box-shadow:var(--sh-flat)}
+.cell canvas{display:block;width:100%;height:76px;object-fit:cover;
+  border-bottom:3px solid var(--ink);background:var(--gray)}
+.cell .meta{display:flex;align-items:center;gap:4px;padding:4px 8px;
+  font-family:var(--mono);font-size:13px;font-weight:700}
+.cell .n{font-weight:900}
+.cell .off{margin-left:auto;font-size:13px}
+.cell.active{background:var(--yellow)}
+.cell.ref::after{
+  content:"REF";position:absolute;top:4px;right:4px;background:var(--violet);color:var(--surface);
+  font-family:var(--mono);font-size:13px;font-weight:700;padding:0 4px;border:2px solid var(--ink)}
+.cell .mv{
+  position:absolute;bottom:32px;display:none;background:var(--surface);border:2px solid var(--ink);
+  width:24px;height:24px;line-height:1;cursor:pointer;padding:0;font-weight:900;border-radius:0}
+.cell:hover .mv{display:block}
+.cell .mv:hover{background:var(--yellow)}
+.cell .mv.l{left:4px}
+.cell .mv.r{left:32px}
+.striphead{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.striphead .lbl{font-size:13px;font-weight:900;text-transform:uppercase;
+  background:var(--ink);color:var(--surface);padding:2px 8px}
+.striphead .lbl+.lbl{background:var(--surface);color:var(--ink);border:2px solid var(--ink);
+  font-weight:500;text-transform:none;font-family:var(--mono)}
+
+/* ---------- overlay ---------- */
+.veil{position:fixed;inset:0;background:var(--ink);display:flex;align-items:center;
+  justify-content:center;z-index:50}
+.card{background:var(--surface);border:3px solid var(--ink);box-shadow:var(--sh-lift);
+  padding:24px;min-width:320px;max-width:min(480px,92vw)}
+.card h3{margin:0 0 12px;font-size:21px;font-weight:900}
+.bar{height:24px;background:var(--surface);border:3px solid var(--ink);overflow:hidden;margin:16px 0 12px}
+.bar i{display:block;height:100%;background:var(--yellow);width:0;
+  border-right:3px solid var(--ink);transition:width .12s linear}
+.card p{font-size:15px;margin:0}
+
+.toast{
+  position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
+  background:var(--yellow);border:3px solid var(--ink);box-shadow:var(--sh);
+  padding:12px 16px;font-size:15px;font-weight:600;z-index:60;max-width:min(560px,90vw)}
+
+@media (max-width:900px){
+  .middle{grid-template-columns:1fr}
+  .side{position:absolute;right:0;top:0;bottom:0;width:312px;z-index:20;
+    transform:translateX(100%);transition:transform .18s ease;border-left:3px solid var(--ink)}
+  .side.open{transform:none}
+  #panelToggle{display:inline-block !important}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+
+/* ---- camera capture workflow additions ---- */
+body{display:flex}
+#camHost{
+  width:380px;flex:none;height:100%;overflow-y:auto;box-sizing:border-box;
+  background:#111;color:#eee;padding:14px;border-right:3px solid var(--ink);
+  font-family:-apple-system,system-ui,sans-serif;
+}
+#camHost h1{font-size:1rem;margin:0 0 4px;font-weight:800}
+#camHost p.sub{margin:0 0 12px;color:#999;font-size:0.78rem;line-height:1.4}
+#camHost .btn-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+#camHost button{
+  background:#2d7dff;color:#fff;border:none;padding:7px 12px;border-radius:6px;
+  font-size:0.78rem;cursor:pointer;font-weight:600
+}
+#camHost button.secondary{background:#333}
+#camHost button:disabled{background:#444;cursor:default}
+#camStatus{
+  margin-bottom:10px;padding:8px 9px;background:#1c1c1c;border-radius:6px;
+  font-size:0.72rem;line-height:1.4;white-space:pre-wrap
+}
+#deviceList{display:none;background:#1c1c1c;border-radius:6px;padding:8px 9px;margin-bottom:10px}
+#deviceList.visible{display:block}
+.device-row{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:0.72rem;border-bottom:1px solid #2a2a2a}
+.device-row:last-child{border-bottom:none}
+.device-row input{width:13px;height:13px}
+#camGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.cam-box{background:#1c1c1c;border-radius:6px;overflow:hidden;border:1px solid #333}
+.cam-label{padding:3px 5px;font-size:0.62rem;color:#bbb;border-bottom:1px solid #333;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cam-box video{width:100%;display:block;background:#000;aspect-ratio:4/3;object-fit:cover}
+.thumb-wrap{display:none;padding:5px;gap:5px;align-items:center}
+.thumb-wrap.visible{display:flex}
+.thumb-wrap img{width:36px;height:27px;object-fit:cover;border-radius:3px;border:1px solid #333}
+.thumb-wrap a{color:#6fa8ff;font-size:0.62rem;text-decoration:none}
+#wiggleHost{flex:1;min-width:0;height:100%;overflow:hidden;position:relative}
+@media (max-width:900px){
+  body{flex-direction:column}
+  #camHost{width:100%;height:38vh;border-right:none;border-bottom:3px solid var(--ink)}
+  #wiggleHost{height:62vh}
+}
+
 </style>
 </head>
 <body>
+<div id="camHost">
+  <h1>Camera Capture</h1>
+  <p class="sub">Detect &amp; select cameras, start feeds, capture — auto-sent to Wigglegram →</p>
+  <div class="btn-row">
+    <button id="detectBtn">Detect Cameras</button>
+    <button id="startBtn" disabled>Start Selected</button>
+  </div>
+  <div class="btn-row">
+    <button id="captureBtn" class="secondary" disabled>📷 Capture &amp; Send</button>
+  </div>
+  <div id="camStatus">Not started yet.</div>
+  <div id="deviceList"></div>
+  <div id="camGrid"></div>
+  <canvas id="captureCanvas" style="display:none;"></canvas>
+</div>
+<div id="wiggleHost">
+<div class="app">
 
-<h1>USB Camera Feed Test</h1>
-<p class="sub">Detect cameras, pick which ones to use, start them, and grab a still photo from any feed.</p>
+  <div class="topbar">
+    <div class="brand">
+      <span class="dot"></span>
+      <b>Wigglegram Bench</b>
+      <span id="status">no frames loaded</span>
+    </div>
+    <label class="btn" id="addBtn" for="file" tabindex="0" role="button">Add frames</label>
+    <button class="btn" id="clearBtn">Clear</button>
+    <button class="btn hide" id="panelToggle">Controls</button>
+    <input type="file" id="file" multiple class="vh">
+  </div>
 
-<div class="btn-row">
-  <button id="detectBtn">Detect Cameras</button>
-  <button id="startBtn" disabled>Start Selected Cameras</button>
+  <div class="middle">
+    <div class="stagewrap">
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" id="tab-align" aria-selected="true">Align</button>
+        <button class="tab" role="tab" id="tab-crop" aria-selected="false">Crop</button>
+        <button class="tab" role="tab" id="tab-preview" aria-selected="false">Preview</button>
+        <span class="tabhint" id="tabhint"></span>
+      </div>
+      <div class="stage">
+        <canvas id="stage"></canvas>
+        <div class="zoombar" id="zoombar">
+          <button class="zb" id="zOut" title="Zoom out">&#8722;</button>
+          <button class="zb lbl" id="zLabel" title="Zoom to fit">Fit</button>
+          <button class="zb" id="zIn" title="Zoom in">+</button>
+          <button class="zb" id="zOne" title="Actual pixels">1:1</button>
+        </div>
+        <div class="empty on" id="empty">
+          <label class="drop" id="drop" for="file">
+            <h2>Drop your frames here</h2>
+            <p>Four exposures from a Nishika N8000, or any set of scans from a multi-lens camera. Drop a single wide scan of the negative strip and you can slice it into frames.</p>
+            <p class="cue">Click to browse, drop files anywhere, or paste from the clipboard.</p>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="side" id="side">
+
+      <!-- SPLIT -->
+      <div class="sect hide" id="splitSect">
+        <h3>Slice the strip</h3>
+        <div class="row"><label>Frames</label><input type="number" id="splitN" min="2" max="8" value="4"></div>
+        <div class="row"><label>Trim ends</label><input type="range" id="splitTrim" min="0" max="20" step="0.5" value="0"><span class="val" id="splitTrimV">0%</span></div>
+        <div class="row"><label>Gutter</label><input type="range" id="splitGap" min="0" max="20" step="0.5" value="0"><span class="val" id="splitGapV">0%</span></div>
+        <div class="btns"><button class="btn go" id="splitBtn">Slice into frames</button></div>
+        <p class="note">Cuts one wide scan into equal vertical frames. Trim shaves the left and right edges first; gutter drops the space between frames.</p>
+      </div>
+
+      <!-- ALIGN -->
+      <div class="sect" id="alignSect">
+        <h3>Align</h3>
+        <div class="row"><label>View</label>
+          <div class="seg" id="viewMode">
+            <button data-v="onion" aria-pressed="true">Onion</button>
+            <button data-v="diff" aria-pressed="false">Diff</button>
+            <button data-v="blink" aria-pressed="false">Blink</button>
+            <button data-v="solo" aria-pressed="false">Solo</button>
+          </div>
+        </div>
+        <div class="row"><label>Blend</label><input type="range" id="onion" min="10" max="100" value="55"><span class="val" id="onionV">55%</span></div>
+        <div class="row"><label>Nudge X</label><input type="range" id="tx" min="-400" max="400" value="0"><span class="val" id="txV">0</span></div>
+        <div class="row"><label>Nudge Y</label><input type="range" id="ty" min="-400" max="400" value="0"><span class="val" id="tyV">0</span></div>
+        <div class="row"><label>Rotate</label><input type="range" id="rot" min="-5" max="5" step="0.05" value="0"><span class="val" id="rotV">0.00°</span></div>
+        <div class="row"><label>Scale</label><input type="range" id="scl" min="90" max="110" step="0.1" value="100"><span class="val" id="sclV">100%</span></div>
+        <div class="btns">
+          <button class="btn" id="pinBtn">Pin a point</button>
+          <button class="btn" id="autoBtn">Auto-align all</button>
+          <button class="btn" id="resetOne">Reset frame</button>
+        </div>
+        <p class="note" id="alignNote">Drag on the image to move the selected frame. Arrow keys nudge one pixel, shift for ten, alt for a quarter. Pick the point that should hold still — usually your subject's eye. Wheel to zoom in on it, space-drag to pan.</p>
+      </div>
+
+      <!-- CROP -->
+      <div class="sect hide" id="cropSect">
+        <h3>Crop</h3>
+        <div class="row"><label>Ratio</label>
+          <select id="cropAspect" class="grow">
+            <option value="0">Free</option>
+            <option value="1">1:1</option>
+            <option value="0.8">4:5</option>
+            <option value="0.75">3:4</option>
+            <option value="1.5">3:2</option>
+            <option value="1.3333">4:3</option>
+            <option value="0.5625">9:16</option>
+            <option value="1.7778">16:9</option>
+          </select>
+        </div>
+        <div class="row"><label>Size</label><span class="val grow" id="cropSize" style="text-align:left">—</span></div>
+        <div class="btns">
+          <button class="btn" id="cropOverlap">Fit to overlap</button>
+          <button class="btn" id="cropFull">Full frame</button>
+        </div>
+        <p class="note">Drag inside the box to move it, drag a corner to resize. Fit to overlap pulls the box in to the area every frame still covers after aligning, so no blank edges creep in.</p>
+      </div>
+
+      <!-- TIMING -->
+      <div class="sect" id="timeSect">
+        <h3>Motion</h3>
+        <div class="row"><label>Frame hold</label><input type="range" id="ms" min="20" max="300" step="5" value="80"><span class="val" id="msV">80ms</span></div>
+        <div class="row"><label>Sequence</label>
+          <div class="seg" id="seqMode">
+            <button data-s="loop" aria-pressed="false">Loop</button>
+            <button data-s="ping" aria-pressed="true">Bounce</button>
+          </div>
+        </div>
+        <div class="btns">
+          <button class="btn" id="revBtn">Reverse order</button>
+          <button class="btn on" id="playBtn">Pause</button>
+        </div>
+      </div>
+
+      <!-- LOOK -->
+      <div class="sect" id="lookSect">
+        <h3>Border</h3>
+        <div class="row"><label>Thickness</label><input type="range" id="bw" min="0" max="20" step="0.5" value="0"><span class="val" id="bwV">0%</span></div>
+        <div class="row"><label>Colour</label>
+          <input type="color" id="bc" value="#f4f1ea">
+          <div class="btns grow">
+            <button class="btn sm" data-bc="#ffffff">White</button>
+            <button class="btn sm" data-bc="#0d0d0d">Black</button>
+            <button class="btn sm" data-bc="#f4f1ea">Bone</button>
+          </div>
+        </div>
+        <div class="row"><label>Rounding</label><input type="range" id="br" min="0" max="12" step="0.5" value="0"><span class="val" id="brV">0%</span></div>
+        <div class="row"><label>Canvas</label>
+          <select id="outAspect" class="grow">
+            <option value="0">Match crop</option>
+            <option value="1">1:1</option>
+            <option value="0.8">4:5</option>
+            <option value="0.5625">9:16</option>
+            <option value="1.7778">16:9</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- EXPORT -->
+      <div class="sect" id="expSect">
+        <h3>Export</h3>
+        <div class="row"><label>Width</label><input type="number" id="outW" min="120" max="4000" step="10" value="900"><span class="val" id="outDims">—</span></div>
+        <div class="row"><label>Colours</label><input type="range" id="gifColors" min="32" max="256" step="8" value="256"><span class="val" id="gifColorsV">256</span></div>
+        <div class="row"><label>Dither</label>
+          <div class="seg" id="ditherSeg">
+            <button data-d="1" aria-pressed="true">On</button>
+            <button data-d="0" aria-pressed="false">Off</button>
+          </div>
+        </div>
+        <div class="row"><label>Video length</label><input type="range" id="vidSec" min="1" max="10" step="0.5" value="3"><span class="val" id="vidSecV">3.0s</span></div>
+        <div class="btns">
+          <button class="btn go" id="gifBtn">Export GIF</button>
+          <button class="btn go" id="mp4Btn">Export video</button>
+          <button class="btn" id="pngBtn">Save frames</button>
+        </div>
+        <p class="note" id="expNote">GIF timing rounds to 10ms and most viewers won't go below 20ms — use the video if you want a fast wiggle. Video records in MP4 where the browser supports it, otherwise WebM.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="strip" id="strip">
+    <div class="striphead">
+      <span class="lbl">Frames</span>
+      <span class="lbl" id="stripHint">click to select / double-click sets reference</span>
+    </div>
+    <div class="cells" id="cells"></div>
+  </div>
 </div>
 
-<div id="status">Not started yet.</div>
-
-<div id="deviceList"></div>
-
-<div id="grid"></div>
-
-<canvas id="captureCanvas" style="display:none;"></canvas>
-
+</div>
 <script>
-const detectBtn = document.getElementById('detectBtn');
-const startBtn = document.getElementById('startBtn');
-const statusEl = document.getElementById('status');
-const deviceListEl = document.getElementById('deviceList');
-const grid = document.getElementById('grid');
-const captureCanvas = document.getElementById('captureCanvas');
+"use strict";
 
-let detectedDevices = []; // [{deviceId, label}]
-let activeStreams = [];   // MediaStream objects currently open, so we can stop them on re-start
+/* ================================================================
+   state
+   ================================================================ */
+const S = {
+  frames: [],          // {img, name, tx, ty, rot, scale, thumb}
+  order: [],           // indices into frames, in playback order
+  ref: 0,
+  active: 0,
+  crop: null,          // {x,y,w,h} in composite space
+  tab: 'align',
+  view: {scale:1, ox:0, oy:0},
+  fitScale: 1, zoomed: false, panKey: false,
+  viewMode: 'onion',
+  onion: 0.55,
+  pinning: false,
+  pins: {},            // frameIndex -> {x,y} in image coords
+  play: {ms:80, ping:true, on:true},
+  out: {w:900, aspect:0, bw:0, bc:'#f4f1ea', br:0},
+  gif: {colors:256, dither:true},
+  vidSec: 3,
+  cropAspect: 0
+};
 
-function log(msg) {
-  statusEl.textContent = msg;
+const $ = id => document.getElementById(id);
+const clamp = (v,a,b) => v < a ? a : v > b ? b : v;
+const stage = $('stage');
+const ctx = stage.getContext('2d');
+
+const iw = f => f.img.naturalWidth || f.img.width;
+const ih = f => f.img.naturalHeight || f.img.height;
+function comp(){ const f = S.frames[S.ref] || S.frames[0]; return f ? {w:iw(f), h:ih(f)} : {w:0,h:0}; }
+
+/* transform helpers: image coords -> composite coords */
+function fwd(f,p){
+  const cx = iw(f)/2, cy = ih(f)/2, a = f.rot*Math.PI/180, s = f.scale;
+  const dx = (p.x-cx)*s, dy = (p.y-cy)*s;
+  return {x: cx + dx*Math.cos(a) - dy*Math.sin(a) + f.tx,
+          y: cy + dx*Math.sin(a) + dy*Math.cos(a) + f.ty};
+}
+function invf(f,p){
+  const cx = iw(f)/2, cy = ih(f)/2, a = -f.rot*Math.PI/180, s = f.scale;
+  const dx = p.x - f.tx - cx, dy = p.y - f.ty - cy;
+  return {x: cx + (dx*Math.cos(a) - dy*Math.sin(a))/s,
+          y: cy + (dx*Math.sin(a) + dy*Math.cos(a))/s};
+}
+function applyT(c,f){
+  c.translate(f.tx, f.ty);
+  c.translate(iw(f)/2, ih(f)/2);
+  c.rotate(f.rot*Math.PI/180);
+  c.scale(f.scale, f.scale);
+  c.translate(-iw(f)/2, -ih(f)/2);
 }
 
-function stopAllActiveStreams() {
-  activeStreams.forEach(s => s.getTracks().forEach(t => t.stop()));
-  activeStreams = [];
+/* ================================================================
+   loading
+   ================================================================ */
+function newFrame(img, name){
+  return {img, name, tx:0, ty:0, rot:0, scale:1};
+}
+/* Decoding a File is the flakiest part of a local tool: blob: URLs fail inside
+   sandboxed iframes, so try three routes before giving up. */
+function imgFromSrc(src, revoke){
+  return new Promise((res,rej)=>{
+    const i = new Image();
+    i.onload = () => { if(revoke) setTimeout(()=>URL.revokeObjectURL(src), 0);
+                       (i.naturalWidth > 0) ? res(i) : rej(new Error('zero size')); };
+    i.onerror = () => { if(revoke) URL.revokeObjectURL(src); rej(new Error('image decode failed')); };
+    i.src = src;
+  });
+}
+async function decodeImage(file){
+  const why = [];
+  if(window.createImageBitmap){
+    for(const opt of [{imageOrientation:'from-image'}, undefined]){
+      try{ return await createImageBitmap(file, opt); }
+      catch(e){ why.push('bitmap: ' + e.message); }
+    }
+  }
+  try{ return await imgFromSrc(URL.createObjectURL(file), true); }
+  catch(e){ why.push('blob url: ' + e.message); }
+  try{
+    const data = await new Promise((res,rej)=>{
+      const r = new FileReader();
+      r.onload = ()=>res(r.result); r.onerror = ()=>rej(new Error('unreadable'));
+      r.readAsDataURL(file);
+    });
+    return await imgFromSrc(data, false);
+  }catch(e){ why.push('data url: ' + e.message); }
+  throw new Error(why.join(' | '));
+}
+async function loadFiles(list){
+  const files = [...list].sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric:true}));
+  if(!files.length){ toast('No files arrived. Use Add frames, or drop them onto the window.'); return; }
+  const loaded = [], failed = [];
+  let why = '';
+  for(const f of files){
+    try{
+      loaded.push(newFrame(await decodeImage(f), f.name));
+    }catch(e){
+      failed.push(f.name);
+      why = why || e.message;
+      console.warn('[wigglegram] could not open', f.name, f.type || '(no type)', f.size + ' bytes', '\u2014', e.message);
+    }
+  }
+  if(failed.length){
+    toast('Couldn\u2019t open ' + failed.length + ' of ' + files.length + ' file' + (files.length>1?'s':'') +
+      '. Reason: ' + why + '. If you\u2019re running this inside a preview pane, download the file and open it in a browser instead \u2014 sandboxed pages can\u2019t read local files. Details are in the console.', 12000);
+  }
+  if(!loaded.length) return;
+  S.frames = S.frames.concat(loaded);
+  S.order = S.frames.map((_,i)=>i);
+  S.ref = 0; S.active = Math.min(1, S.frames.length-1);
+  S.pins = {};
+  S.crop = null;
+  fitView(); resetCropFull(); buildStrip(); syncUI();
+  $('empty').classList.remove('on'); $('empty').style.display = 'none';
+  $('splitSect').classList.toggle('hide', S.frames.length !== 1);
+  if(S.frames.length === 1) toast('One image loaded — slice it into frames in the panel, or add more files.');
 }
 
-async function detect() {
-  detectBtn.disabled = true;
-  startBtn.disabled = true;
-  log('Requesting camera permission...');
+/* slice a single wide scan into N frames */
+function sliceStrip(){
+  if(S.frames.length !== 1) return;
+  const src = S.frames[0].img;
+  const n = clamp(parseInt($('splitN').value)||4, 2, 8);
+  const trim = (parseFloat($('splitTrim').value)||0)/100;
+  const gap  = (parseFloat($('splitGap').value)||0)/100;
+  const W = src.naturalWidth || src.width, H = src.naturalHeight || src.height;
+  const x0 = W*trim, usable = W*(1-2*trim);
+  const cell = usable/n, inset = cell*gap/2;
+  const out = [];
+  for(let i=0;i<n;i++){
+    const sx = Math.round(x0 + i*cell + inset);
+    const sw = Math.max(4, Math.round(cell - 2*inset));
+    const cv = document.createElement('canvas');
+    cv.width = sw; cv.height = H;
+    cv.getContext('2d').drawImage(src, sx, 0, sw, H, 0, 0, sw, H);
+    out.push(newFrame(cv, 'frame ' + (i+1)));
+  }
+  S.frames = out; S.order = out.map((_,i)=>i);
+  S.ref = 0; S.active = 1; S.pins = {}; 
+  fitView(); resetCropFull(); buildStrip(); syncUI();
+  $('splitSect').classList.add('hide');
+  toast('Sliced into ' + n + ' frames.');
+}
 
-  try {
-    // Request permission once first — needed so enumerateDevices() returns
-    // labeled devices instead of blank ones on most browsers.
-    const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
-    tempStream.getTracks().forEach(t => t.stop());
+/* ================================================================
+   view fitting
+   ================================================================ */
+function sizeStage(){
+  const r = stage.parentElement.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio||1, 2);
+  stage.width = Math.max(1, Math.round(r.width*dpr));
+  stage.height = Math.max(1, Math.round(r.height*dpr));
+  stage.style.width = r.width+'px'; stage.style.height = r.height+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  S._css = {w:r.width, h:r.height};
+}
+function fitView(){
+  sizeStage();
+  const c = comp(); if(!c.w) return;
+  const pad = 46;
+  const s = Math.min((S._css.w-pad)/c.w, (S._css.h-pad)/c.h);
+  S.view.scale = s; S.fitScale = s; S.zoomed = false;
+  S.view.ox = (S._css.w - c.w*s)/2;
+  S.view.oy = (S._css.h - c.h*s)/2;
+  showZoom();
+}
+function zoomAt(px, py, factor){
+  const c = comp(); if(!c.w) return;
+  const before = toComp({x:px, y:py});
+  const lo = (S.fitScale || 1) * 0.4, hi = 16;
+  const next = clamp(S.view.scale * factor, Math.min(lo, hi), hi);
+  if(next === S.view.scale) return;
+  S.view.scale = next;
+  S.view.ox = px - before.x*next;
+  S.view.oy = py - before.y*next;
+  S.zoomed = true;
+  clampView(); showZoom();
+}
+function zoomTo(scale){
+  zoomAt(S._css.w/2, S._css.h/2, scale / S.view.scale);
+}
+function clampView(){
+  const c = comp(); if(!c.w) return;
+  const w = c.w*S.view.scale, h = c.h*S.view.scale;
+  const cx = S.view.ox + w/2, cy = S.view.oy + h/2;
+  S.view.ox += clamp(cx, 0, S._css.w) - cx;
+  S.view.oy += clamp(cy, 0, S._css.h) - cy;
+}
+function showZoom(){
+  const el = $('zLabel'); if(!el) return;
+  el.textContent = (!S.zoomed || Math.abs(S.view.scale - (S.fitScale||1)) < 1e-6)
+    ? 'Fit' : Math.round(S.view.scale*100) + '%';
+}
+const toScreen = p => ({x: p.x*S.view.scale + S.view.ox, y: p.y*S.view.scale + S.view.oy});
+const toComp  = p => ({x: (p.x - S.view.ox)/S.view.scale, y: (p.y - S.view.oy)/S.view.scale});
+function evPt(e){
+  const r = stage.getBoundingClientRect();
+  return {x: e.clientX - r.left, y: e.clientY - r.top};
+}
 
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    detectedDevices = devices.filter(d => d.kind === 'videoinput');
+/* ================================================================
+   stage drawing
+   ================================================================ */
+let blinkOn = false;
+function drawStage(){
+  if(!S.frames.length){ ctx.clearRect(0,0,stage.width,stage.height); return; }
+  const c = comp();
+  ctx.save();
+  ctx.clearRect(0,0,S._css.w,S._css.h);
+  ctx.imageSmoothingEnabled = S.view.scale <= 2;
 
-    if (detectedDevices.length === 0) {
-      log('No cameras found. Make sure devices are connected and recognized by the OS/browser.');
-      deviceListEl.classList.remove('visible');
+  if(S.tab === 'preview'){ drawPreview(); ctx.restore(); return; }
+
+  // lightbox plate behind the composite
+  const o = toScreen({x:0,y:0});
+  const w = c.w*S.view.scale, h = c.h*S.view.scale;
+  ctx.fillStyle = '#1C293C';
+  ctx.fillRect(o.x+6, o.y+6, w, h);
+  ctx.fillStyle = '#C9C7C0';
+  ctx.fillRect(o.x, o.y, w, h);
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(o.x,o.y,w,h); ctx.clip();
+  ctx.translate(S.view.ox, S.view.oy); ctx.scale(S.view.scale, S.view.scale);
+
+  const ref = S.frames[S.ref], act = S.frames[S.active];
+  const mode = S.tab === 'crop' ? 'cropview' : S.viewMode;
+
+  if(mode === 'cropview'){
+    ctx.globalAlpha = 1; drawF(ctx, ref);
+    ctx.globalAlpha = 0.45;
+    S.frames.forEach((f,i)=>{ if(i!==S.ref) drawF(ctx,f); });
+    ctx.globalAlpha = 1;
+  } else if(mode === 'solo'){
+    drawF(ctx, act);
+  } else if(mode === 'blink'){
+    drawF(ctx, blinkOn ? act : ref);
+  } else if(mode === 'diff'){
+    drawF(ctx, ref);
+    ctx.globalCompositeOperation = 'difference';
+    drawF(ctx, act);
+    ctx.globalCompositeOperation = 'source-over';
+  } else {
+    ctx.globalAlpha = 1; drawF(ctx, ref);
+    ctx.globalAlpha = S.onion; drawF(ctx, act);
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+  ctx.strokeStyle = '#1C293C'; ctx.lineWidth = 3;
+  ctx.strokeRect(o.x-1.5, o.y-1.5, w+3, h+3);
+
+  // crop rectangle
+  if(S.crop){
+    const a = toScreen({x:S.crop.x,y:S.crop.y});
+    const cw = S.crop.w*S.view.scale, chh = S.crop.h*S.view.scale;
+    if(S.tab === 'crop'){
+      ctx.fillStyle = '#1C293C';
+      ctx.globalAlpha = 0.72;
+      ctx.beginPath();
+      ctx.rect(o.x,o.y,w,h);
+      ctx.rect(a.x, a.y, cw, chh);
+      ctx.fill('evenodd');
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = '#FDC800'; ctx.lineWidth = 3;
+      ctx.strokeRect(a.x+.5, a.y+.5, cw, chh);
+      ctx.strokeStyle = '#FDC800'; ctx.globalAlpha = .5; ctx.lineWidth = 2;
+      for(let i=1;i<3;i++){
+        ctx.beginPath();
+        ctx.moveTo(a.x + cw*i/3, a.y); ctx.lineTo(a.x + cw*i/3, a.y+chh);
+        ctx.moveTo(a.x, a.y + chh*i/3); ctx.lineTo(a.x+cw, a.y + chh*i/3);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#FDC800';
+      ctx.strokeStyle = '#1C293C'; ctx.lineWidth = 2;
+      for(const hd of handles()){
+        const p = toScreen(hd);
+        ctx.fillRect(p.x-5, p.y-5, 10, 10);
+        ctx.strokeRect(p.x-5, p.y-5, 10, 10);
+      }
+    } else {
+      ctx.setLineDash([8,6]); ctx.strokeStyle = '#432DD7'; ctx.lineWidth = 3;
+      ctx.strokeRect(a.x+.5, a.y+.5, cw, chh);
+      ctx.setLineDash([]);
+    }
+  }
+
+  // pins
+  if(S.tab === 'align'){
+    for(const k in S.pins){
+      const i = +k, f = S.frames[i]; if(!f) continue;
+      const p = toScreen(fwd(f, S.pins[k]));
+      const on = (i === S.active || i === S.ref);
+      ctx.strokeStyle = i === S.ref ? '#432DD7' : '#DC2626';
+      ctx.globalAlpha = on ? 1 : .45;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(p.x-9,p.y); ctx.lineTo(p.x-3,p.y);
+      ctx.moveTo(p.x+3,p.y); ctx.lineTo(p.x+9,p.y);
+      ctx.moveTo(p.x,p.y-9); ctx.lineTo(p.x,p.y-3);
+      ctx.moveTo(p.x,p.y+3); ctx.lineTo(p.x,p.y+9);
+      ctx.stroke();
+      ctx.beginPath(); ctx.arc(p.x,p.y,7,0,7); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+  ctx.restore();
+}
+function drawF(c, f){
+  if(!f) return;
+  c.save(); applyT(c,f); c.drawImage(f.img, 0, 0); c.restore();
+}
+
+/* ================================================================
+   output rendering (single source of truth for preview + export)
+   ================================================================ */
+function outDims(){
+  const cr = S.crop || {x:0,y:0,w:comp().w,h:comp().h};
+  let innerW = Math.max(2, Math.round(S.out.w));
+  const s = innerW / cr.w;
+  let innerH = Math.max(2, Math.round(cr.h*s));
+  let cw = innerW, ch = innerH;
+  if(S.out.aspect){
+    if(cw/ch < S.out.aspect) cw = Math.round(ch*S.out.aspect);
+    else ch = Math.round(cw/S.out.aspect);
+  }
+  const b = Math.round(S.out.bw/100 * Math.min(cw,ch));
+  let W = cw + 2*b, H = ch + 2*b;
+  W += W%2; H += H%2;
+  return {W,H,innerW,innerH,s,b,cr,offX:Math.round((W-innerW)/2), offY:Math.round((H-innerH)/2)};
+}
+function roundRect(c,x,y,w,h,r){
+  r = Math.min(r, w/2, h/2);
+  c.beginPath();
+  c.moveTo(x+r,y); c.lineTo(x+w-r,y); c.arcTo(x+w,y,x+w,y+r,r);
+  c.lineTo(x+w,y+h-r); c.arcTo(x+w,y+h,x+w-r,y+h,r);
+  c.lineTo(x+r,y+h); c.arcTo(x,y+h,x,y+h-r,r);
+  c.lineTo(x,y+r); c.arcTo(x,y,x+r,y,r);
+  c.closePath();
+}
+function renderOut(c, d, idx){
+  c.save();
+  c.fillStyle = S.out.bw > 0 || S.out.aspect ? S.out.bc : '#000';
+  c.fillRect(0,0,d.W,d.H);
+  c.save();
+  const r = S.out.br/100 * Math.min(d.innerW, d.innerH);
+  if(r > 0.5){ roundRect(c, d.offX, d.offY, d.innerW, d.innerH, r); c.clip(); }
+  else { c.beginPath(); c.rect(d.offX, d.offY, d.innerW, d.innerH); c.clip(); }
+  c.fillStyle = '#000'; c.fillRect(d.offX, d.offY, d.innerW, d.innerH);
+  c.translate(d.offX - d.cr.x*d.s, d.offY - d.cr.y*d.s);
+  c.scale(d.s, d.s);
+  const f = S.frames[idx];
+  if(f){ applyT(c,f); c.drawImage(f.img,0,0); }
+  c.restore();
+  c.restore();
+}
+let outCv = document.createElement('canvas');
+function drawPreview(){
+  const d = outDims();
+  if(outCv.width !== d.W || outCv.height !== d.H){ outCv.width = d.W; outCv.height = d.H; }
+  const oc = outCv.getContext('2d');
+  oc.setTransform(1,0,0,1,0,0);
+  renderOut(oc, d, seqAt(nowIdx()));
+  const pad = 40;
+  const sc = Math.min((S._css.w-pad)/d.W, (S._css.h-pad)/d.H, 1.6);
+  const x = (S._css.w - d.W*sc)/2, y = (S._css.h - d.H*sc)/2;
+  ctx.fillStyle = '#1C293C';
+  ctx.fillRect(x+6, y+6, d.W*sc, d.H*sc);
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(outCv, x, y, d.W*sc, d.H*sc);
+  ctx.strokeStyle = '#1C293C'; ctx.lineWidth = 3;
+  ctx.strokeRect(x-1.5, y-1.5, d.W*sc+3, d.H*sc+3);
+}
+
+/* sequence */
+function sequence(){
+  const o = S.order.filter(i => S.frames[i]);
+  if(o.length < 2) return o;
+  if(!S.play.ping) return o;
+  const back = o.slice(1, -1).reverse();
+  return o.concat(back);
+}
+function nowIdx(){
+  const seq = sequence(); if(!seq.length) return 0;
+  if(!S.play.on) return S._hold || 0;
+  return Math.floor(performance.now() / S.play.ms) % seq.length;
+}
+function seqAt(i){ const seq = sequence(); return seq.length ? seq[i % seq.length] : 0; }
+
+/* ================================================================
+   filmstrip
+   ================================================================ */
+function buildStrip(){
+  const box = $('cells'); box.innerHTML = '';
+  S.order.forEach((fi, pos) => {
+    const f = S.frames[fi]; if(!f) return;
+    const el = document.createElement('div');
+    el.className = 'cell' + (fi === S.active ? ' active' : '') + (fi === S.ref ? ' ref' : '');
+    const cv = document.createElement('canvas');
+    cv.width = 208; cv.height = 132;
+    const c = cv.getContext('2d');
+    const sc = Math.max(208/iw(f), 132/ih(f));
+    c.drawImage(f.img, (208-iw(f)*sc)/2, (132-ih(f)*sc)/2, iw(f)*sc, ih(f)*sc);
+    el.appendChild(cv);
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.innerHTML = '<span class="n">' + (pos+1) + '</span><span class="off">' +
+      Math.round(f.tx) + ',' + Math.round(f.ty) + '</span>';
+    el.appendChild(meta);
+    const l = document.createElement('button'); l.className = 'mv l'; l.textContent = '\u2039'; l.title = 'Move earlier';
+    const r = document.createElement('button'); r.className = 'mv r'; r.textContent = '\u203A'; r.title = 'Move later';
+    l.onclick = e => { e.stopPropagation(); move(pos,-1); };
+    r.onclick = e => { e.stopPropagation(); move(pos, 1); };
+    el.append(l,r);
+    el.onclick = () => { S.active = fi; buildStrip(); syncUI(); };
+    el.ondblclick = () => { S.ref = fi; buildStrip(); syncUI(); toast('Frame ' + (pos+1) + ' is now the reference.'); };
+    box.appendChild(el);
+  });
+}
+function move(pos, dir){
+  const j = pos + dir; if(j < 0 || j >= S.order.length) return;
+  const t = S.order[pos]; S.order[pos] = S.order[j]; S.order[j] = t;
+  buildStrip();
+}
+function refreshOffsets(){
+  const cells = $('cells').children;
+  S.order.forEach((fi,pos)=>{
+    const f = S.frames[fi], el = cells[pos];
+    if(!f || !el) return;
+    const o = el.querySelector('.off');
+    if(o) o.textContent = Math.round(f.tx) + ',' + Math.round(f.ty);
+  });
+}
+
+/* ================================================================
+   align interactions
+   ================================================================ */
+let drag = null;
+const ptrs = new Map();
+let pinch = null;
+
+function pinchState(){
+  const [a,b] = [...ptrs.values()];
+  return {d: Math.hypot(a.x-b.x, a.y-b.y), m:{x:(a.x+b.x)/2, y:(a.y+b.y)/2}};
+}
+stage.addEventListener('pointerdown', e => {
+  ptrs.set(e.pointerId, evPt(e));
+  if(ptrs.size === 2 && S.tab !== 'preview'){ pinch = pinchState(); drag = null; return; }
+  if(!S.frames.length) return;
+  const p = evPt(e), cp = toComp(p);
+  if(e.button === 1 || S.panKey){
+    if(S.tab === 'preview') return;
+    e.preventDefault();
+    drag = {type:'pan', last:p};
+    stage.classList.add('panning');
+    stage.setPointerCapture(e.pointerId);
+    return;
+  }
+  if(S.tab === 'align'){
+    if(S.pinning){ setPin(cp); return; }
+    drag = {type:'move', last:cp};
+    stage.classList.add('dragging');
+    stage.setPointerCapture(e.pointerId);
+  } else if(S.tab === 'crop' && S.crop){
+    const h = hitHandle(p);
+    if(h){ drag = {type:'resize', h, start:cp, c0:{...S.crop}}; }
+    else if(cp.x>=S.crop.x && cp.x<=S.crop.x+S.crop.w && cp.y>=S.crop.y && cp.y<=S.crop.y+S.crop.h){
+      drag = {type:'cropmove', last:cp};
+    } else return;
+    stage.classList.add('dragging');
+    stage.setPointerCapture(e.pointerId);
+  }
+});
+stage.addEventListener('pointermove', e => {
+  if(ptrs.has(e.pointerId)) ptrs.set(e.pointerId, evPt(e));
+  if(ptrs.size === 2 && S.tab !== 'preview'){
+    const now = pinchState();
+    if(pinch && pinch.d > 0){
+      zoomAt(now.m.x, now.m.y, now.d / pinch.d);
+      S.view.ox += now.m.x - pinch.m.x;
+      S.view.oy += now.m.y - pinch.m.y;
+      clampView();
+    }
+    pinch = now;
+    return;
+  }
+  if(!drag) return;
+  if(drag.type === 'pan'){
+    const p = evPt(e);
+    S.view.ox += p.x - drag.last.x;
+    S.view.oy += p.y - drag.last.y;
+    drag.last = p; S.zoomed = true; clampView();
+    return;
+  }
+  const cp = toComp(evPt(e));
+  if(drag.type === 'move'){
+    const f = S.frames[S.active];
+    f.tx += cp.x - drag.last.x; f.ty += cp.y - drag.last.y;
+    drag.last = cp; syncSliders(); refreshOffsets();
+  } else if(drag.type === 'cropmove'){
+    S.crop.x += cp.x - drag.last.x; S.crop.y += cp.y - drag.last.y;
+    drag.last = cp; clampCrop(); showCropSize();
+  } else if(drag.type === 'resize'){
+    resizeCrop(drag, cp);
+  }
+});
+function endDrag(e){
+  ptrs.delete(e.pointerId);
+  if(ptrs.size < 2) pinch = null;
+  stage.classList.remove('panning');
+  if(!drag) return;
+  drag = null; stage.classList.remove('dragging');
+  try{ stage.releasePointerCapture(e.pointerId); }catch(_){}
+}
+stage.addEventListener('pointerup', endDrag);
+stage.addEventListener('pointercancel', endDrag);
+stage.addEventListener('auxclick', e => { if(e.button === 1) e.preventDefault(); });
+stage.addEventListener('contextmenu', e => { if(S.panKey) e.preventDefault(); });
+stage.addEventListener('wheel', e => {
+  if(!S.frames.length || S.tab === 'preview') return;
+  e.preventDefault();
+  const p = evPt(e);
+  const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1);
+  zoomAt(p.x, p.y, Math.exp(-dy * (e.ctrlKey ? 0.010 : 0.0022)));
+}, {passive:false});
+
+window.addEventListener('keydown', e => {
+  if(/input|select|textarea/i.test(e.target.tagName)) return;
+  if(e.key === ' ' && !e.repeat){
+    e.preventDefault();
+    S.panKey = true;
+    if(S.tab !== 'preview') stage.classList.add('panready');
+    return;
+  }
+  if(!S.frames.length) return;
+  const step = e.altKey ? 0.25 : e.shiftKey ? 10 : 1;
+  if(S.tab === 'align'){
+    const f = S.frames[S.active]; let hit = true;
+    if(e.key === 'ArrowLeft') f.tx -= step;
+    else if(e.key === 'ArrowRight') f.tx += step;
+    else if(e.key === 'ArrowUp') f.ty -= step;
+    else if(e.key === 'ArrowDown') f.ty += step;
+    else hit = false;
+    if(hit){ e.preventDefault(); syncSliders(); refreshOffsets(); return; }
+  }
+  if(e.key >= '1' && e.key <= '9'){
+    const i = S.order[+e.key - 1];
+    if(i !== undefined){ S.active = i; buildStrip(); syncUI(); }
+  }
+  else if(e.key === '0'){ fitView(); }
+  else if(e.key === '+' || e.key === '=') zoomTo(S.view.scale*1.3);
+  else if(e.key === '-' || e.key === '_') zoomTo(S.view.scale/1.3);
+  else if(e.key === 'p' || e.key === 'P') togglePlay();
+});
+window.addEventListener('keyup', e => {
+  if(e.key === ' '){ S.panKey = false; stage.classList.remove('panready','panning'); }
+});
+window.addEventListener('blur', () => { S.panKey = false; stage.classList.remove('panready','panning'); });
+
+function setPin(cp){
+  const f = S.frames[S.active];
+  S.pins[S.active] = invf(f, cp);
+  if(S.active !== S.ref && S.pins[S.ref]){
+    const target = fwd(S.frames[S.ref], S.pins[S.ref]);
+    const cx = iw(f)/2, cy = ih(f)/2, a = f.rot*Math.PI/180, s = f.scale;
+    const p = S.pins[S.active];
+    const dx = (p.x-cx)*s, dy = (p.y-cy)*s;
+    const rx = cx + dx*Math.cos(a) - dy*Math.sin(a);
+    const ry = cy + dx*Math.sin(a) + dy*Math.cos(a);
+    f.tx = target.x - rx; f.ty = target.y - ry;
+    syncSliders(); refreshOffsets();
+  }
+  // advance to the next frame that still needs a pin
+  const seq = S.order;
+  const nextI = seq.find(i => S.pins[i] === undefined);
+  if(nextI !== undefined){ S.active = nextI; buildStrip(); syncUI(); }
+  else { S.pinning = false; $('pinBtn').classList.remove('on'); stage.classList.remove('picking');
+         toast('All frames pinned.'); }
+}
+
+/* ---------- auto align (translation, zero-mean NCC) ---------- */
+function grayOf(f, scale, useTranslate){
+  const c = comp();
+  const W = Math.max(8, Math.round(c.w*scale)), H = Math.max(8, Math.round(c.h*scale));
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const g = cv.getContext('2d', {willReadFrequently:true});
+  g.fillStyle = '#000'; g.fillRect(0,0,W,H);
+  g.scale(scale, scale);
+  const tmp = useTranslate ? f : {...f, tx:0, ty:0};
+  applyT(g, tmp);
+  g.drawImage(f.img, 0, 0);
+  const d = g.getImageData(0,0,W,H).data;
+  const out = new Float32Array(W*H);
+  for(let i=0,j=0;i<out.length;i++,j+=4) out[i] = 0.299*d[j] + 0.587*d[j+1] + 0.114*d[j+2];
+  return {w:W, h:H, d:out};
+}
+function bestShift(A, B, rect, range, seed){
+  let best = null;
+  const {x0,y0,x1,y1} = rect;
+  for(let dy = seed.y-range; dy <= seed.y+range; dy++){
+    for(let dx = seed.x-range; dx <= seed.x+range; dx++){
+      let sa=0, sb=0, saa=0, sbb=0, sab=0, n=0;
+      for(let y=y0; y<y1; y+=2){
+        const by = y - dy;
+        if(by < 0 || by >= B.h) continue;
+        const ra = y*A.w, rb = by*B.w;
+        for(let x=x0; x<x1; x+=2){
+          const bx = x - dx;
+          if(bx < 0 || bx >= B.w) continue;
+          const a = A.d[ra+x], b = B.d[rb+bx];
+          sa+=a; sb+=b; saa+=a*a; sbb+=b*b; sab+=a*b; n++;
+        }
+      }
+      if(n < 40) continue;
+      const cov = sab/n - (sa/n)*(sb/n);
+      const va = saa/n - (sa/n)*(sa/n), vb = sbb/n - (sb/n)*(sb/n);
+      const sc = cov / Math.sqrt(Math.max(va*vb, 1e-6));
+      if(!best || sc > best.s) best = {s:sc, x:dx, y:dy};
+    }
+  }
+  return best || {x:seed.x, y:seed.y, s:0};
+}
+async function autoAlign(){
+  if(S.frames.length < 2) return;
+  const c = comp();
+  const coarse = Math.min(1, 260 / c.w);
+  const fine = Math.min(1, 700 / c.w);
+  const region = S.crop
+    ? {x:S.crop.x + S.crop.w*0.2, y:S.crop.y + S.crop.h*0.2, w:S.crop.w*0.6, h:S.crop.h*0.6}
+    : {x:c.w*0.25, y:c.h*0.25, w:c.w*0.5, h:c.h*0.5};
+  const prog = openProgress('Aligning frames', 'Matching each frame to the reference.');
+  await tick();
+  const refC = grayOf(S.frames[S.ref], coarse, true);
+  const refF = grayOf(S.frames[S.ref], fine, true);
+  const others = S.order.filter(i => i !== S.ref);
+  let done = 0;
+  for(const i of others){
+    const f = S.frames[i];
+    const gC = grayOf(f, coarse, false);
+    let r = {
+      x0: Math.round(region.x*coarse), y0: Math.round(region.y*coarse),
+      x1: Math.round((region.x+region.w)*coarse), y1: Math.round((region.y+region.h)*coarse)
+    };
+    const range = Math.max(6, Math.round(c.w*0.10*coarse));
+    const c1 = bestShift(refC, gC, r, range, {x:0,y:0});
+    const gF = grayOf(f, fine, false);
+    r = {
+      x0: Math.round(region.x*fine), y0: Math.round(region.y*fine),
+      x1: Math.round((region.x+region.w)*fine), y1: Math.round((region.y+region.h)*fine)
+    };
+    const seed = {x: Math.round(c1.x*fine/coarse), y: Math.round(c1.y*fine/coarse)};
+    const c2 = bestShift(refF, gF, r, Math.ceil(fine/coarse) + 2, seed);
+    f.tx = c2.x / fine; f.ty = c2.y / fine;
+    done++; prog.set(done/others.length);
+    await tick();
+  }
+  prog.close();
+  syncSliders(); refreshOffsets();
+  toast('Aligned on the centre of the frame. Fine-tune with the arrow keys, or pin a point if it locked onto the wrong thing.');
+}
+const tick = () => new Promise(r => setTimeout(r, 0));
+
+/* ================================================================
+   crop
+   ================================================================ */
+function resetCropFull(){
+  const c = comp();
+  S.crop = {x:0, y:0, w:c.w, h:c.h};
+  applyCropAspect(); showCropSize();
+}
+function cropOverlap(){
+  const c = comp();
+  let L=-1e9, T=-1e9, R=1e9, B=1e9;
+  for(const f of S.frames){
+    const pts = [{x:0,y:0},{x:iw(f),y:0},{x:0,y:ih(f)},{x:iw(f),y:ih(f)}].map(p=>fwd(f,p));
+    L = Math.max(L, Math.max(...[pts[0].x,pts[2].x]));
+    R = Math.min(R, Math.min(...[pts[1].x,pts[3].x]));
+    T = Math.max(T, Math.max(...[pts[0].y,pts[1].y]));
+    B = Math.min(B, Math.min(...[pts[2].y,pts[3].y]));
+  }
+  L = Math.max(0,L); T = Math.max(0,T); R = Math.min(c.w,R); B = Math.min(c.h,B);
+  if(R-L < 20 || B-T < 20){ toast('Frames barely overlap — check the alignment first.'); return; }
+  S.crop = {x:L, y:T, w:R-L, h:B-T};
+  applyCropAspect(); showCropSize();
+}
+function applyCropAspect(){
+  const a = S.cropAspect; if(!a || !S.crop) return;
+  const c = S.crop, cx = c.x + c.w/2, cy = c.y + c.h/2;
+  let w = c.w, h = c.w/a;
+  if(h > c.h){ h = c.h; w = c.h*a; }
+  S.crop = {x:cx-w/2, y:cy-h/2, w, h};
+  clampCrop();
+}
+function clampCrop(){
+  const c = comp();
+  S.crop.w = clamp(S.crop.w, 16, c.w); S.crop.h = clamp(S.crop.h, 16, c.h);
+  S.crop.x = clamp(S.crop.x, 0, c.w - S.crop.w);
+  S.crop.y = clamp(S.crop.y, 0, c.h - S.crop.h);
+}
+function handles(){
+  const c = S.crop; if(!c) return [];
+  return [
+    {x:c.x,y:c.y,k:'nw'},{x:c.x+c.w/2,y:c.y,k:'n'},{x:c.x+c.w,y:c.y,k:'ne'},
+    {x:c.x+c.w,y:c.y+c.h/2,k:'e'},{x:c.x+c.w,y:c.y+c.h,k:'se'},{x:c.x+c.w/2,y:c.y+c.h,k:'s'},
+    {x:c.x,y:c.y+c.h,k:'sw'},{x:c.x,y:c.y+c.h/2,k:'w'}
+  ];
+}
+function hitHandle(p){
+  for(const h of handles()){
+    const s = toScreen(h);
+    if(Math.abs(s.x-p.x) <= 8 && Math.abs(s.y-p.y) <= 8) return h.k;
+  }
+  return null;
+}
+function resizeCrop(d, cp){
+  const c0 = d.c0, k = d.h;
+  let L = c0.x, T = c0.y, R = c0.x+c0.w, B = c0.y+c0.h;
+  if(k.includes('w')) L = cp.x;
+  if(k.includes('e')) R = cp.x;
+  if(k.includes('n')) T = cp.y;
+  if(k.includes('s')) B = cp.y;
+  if(R-L < 16){ if(k.includes('w')) L = R-16; else R = L+16; }
+  if(B-T < 16){ if(k.includes('n')) T = B-16; else B = T+16; }
+  S.crop = {x:L, y:T, w:R-L, h:B-T};
+  if(S.cropAspect){
+    const a = S.cropAspect;
+    if(k === 'n' || k === 's'){ const w = S.crop.h*a; S.crop.x = c0.x + c0.w/2 - w/2; S.crop.w = w; }
+    else { const h = S.crop.w/a;
+      if(k.includes('n')) S.crop.y = B - h; else S.crop.y = T;
+      S.crop.h = h; }
+  }
+  clampCrop(); showCropSize();
+}
+function showCropSize(){
+  if(!S.crop) return;
+  $('cropSize').textContent = Math.round(S.crop.w) + ' \u00d7 ' + Math.round(S.crop.h) + ' px';
+  const d = outDims();
+  $('outDims').textContent = d.W + '\u00d7' + d.H;
+}
+
+/* ================================================================
+   GIF encoder (palette + optional dither + LZW)
+   ================================================================ */
+function medianCut(samples, maxColors){
+  let boxes = [{px: samples}];
+  const spread = b => {
+    let rmin=255,rmax=0,gmin=255,gmax=0,bmin=255,bmax=0;
+    for(const p of b.px){
+      if(p[0]<rmin)rmin=p[0]; if(p[0]>rmax)rmax=p[0];
+      if(p[1]<gmin)gmin=p[1]; if(p[1]>gmax)gmax=p[1];
+      if(p[2]<bmin)bmin=p[2]; if(p[2]>bmax)bmax=p[2];
+    }
+    const r=rmax-rmin, g=gmax-gmin, bl=bmax-bmin;
+    const m = Math.max(r,g,bl);
+    return {m, ch: m===r?0:(m===g?1:2)};
+  };
+  while(boxes.length < maxColors){
+    let bi=-1, best=-1, ch=0;
+    boxes.forEach((b,i)=>{
+      if(b.px.length < 2) return;
+      const s = spread(b);
+      if(s.m > best){ best = s.m; bi = i; ch = s.ch; }
+    });
+    if(bi < 0 || best <= 0) break;
+    const b = boxes[bi];
+    b.px.sort((p,q)=>p[ch]-q[ch]);
+    const mid = b.px.length >> 1;
+    boxes.splice(bi, 1, {px:b.px.slice(0,mid)}, {px:b.px.slice(mid)});
+  }
+  const pal = [];
+  for(const b of boxes){
+    if(!b.px.length) continue;
+    let r=0,g=0,bl=0;
+    for(const p of b.px){ r+=p[0]; g+=p[1]; bl+=p[2]; }
+    const n = b.px.length;
+    pal.push([Math.round(r/n), Math.round(g/n), Math.round(bl/n)]);
+  }
+  while(pal.length < 2) pal.push([0,0,0]);
+  return pal;
+}
+function paletteFor(frames, maxColors){
+  const samples = [];
+  for(const d of frames){
+    const step = Math.max(4, Math.floor(d.length/4/22000)*4);
+    for(let i=0;i<d.length;i+=step) samples.push([d[i], d[i+1], d[i+2]]);
+  }
+  const pal = medianCut(samples, maxColors);
+  const cache = new Int16Array(32768).fill(-1);
+  const near = (r,g,b) => {
+    const key = ((r>>3)<<10) | ((g>>3)<<5) | (b>>3);
+    let v = cache[key];
+    if(v >= 0) return v;
+    let bi=0, bd=Infinity;
+    for(let i=0;i<pal.length;i++){
+      const dr=r-pal[i][0], dg=g-pal[i][1], db=b-pal[i][2];
+      const dd = dr*dr*0.3 + dg*dg*0.59 + db*db*0.11;
+      if(dd < bd){ bd = dd; bi = i; }
+    }
+    cache[key] = bi;
+    return bi;
+  };
+  return {pal, near};
+}
+function quantize(data, w, h, P, dither){
+  const out = new Uint8Array(w*h);
+  if(!dither){
+    for(let i=0,j=0;i<out.length;i++,j+=4) out[i] = P.near(data[j], data[j+1], data[j+2]);
+    return out;
+  }
+  const buf = new Float32Array(w*h*3);
+  for(let i=0,j=0;i<w*h;i++,j+=4){ buf[i*3]=data[j]; buf[i*3+1]=data[j+1]; buf[i*3+2]=data[j+2]; }
+  const push = (i,er,eg,eb,f) => {
+    buf[i*3] += er*f; buf[i*3+1] += eg*f; buf[i*3+2] += eb*f;
+  };
+  for(let y=0;y<h;y++){
+    for(let x=0;x<w;x++){
+      const i = y*w+x;
+      const r = clamp(buf[i*3],0,255), g = clamp(buf[i*3+1],0,255), b = clamp(buf[i*3+2],0,255);
+      const pi = P.near(Math.round(r), Math.round(g), Math.round(b));
+      out[i] = pi;
+      const er = r-P.pal[pi][0], eg = g-P.pal[pi][1], eb = b-P.pal[pi][2];
+      if(x+1<w) push(i+1, er,eg,eb, 7/16);
+      if(y+1<h){
+        if(x>0) push(i+w-1, er,eg,eb, 3/16);
+        push(i+w, er,eg,eb, 5/16);
+        if(x+1<w) push(i+w+1, er,eg,eb, 1/16);
+      }
+    }
+  }
+  return out;
+}
+function lzw(minCode, px, out){
+  const clear = 1<<minCode, eoi = clear+1;
+  let size = minCode+1, next = eoi+1, cur = 0, bits = 0;
+  let dict = new Map();
+  const buf = [];
+  const push = code => {
+    cur |= code << bits; bits += size;
+    while(bits >= 8){ buf.push(cur & 255); cur >>= 8; bits -= 8; }
+  };
+  push(clear);
+  let prefix = px[0];
+  for(let i=1;i<px.length;i++){
+    const k = px[i], key = (prefix<<8)|k;
+    const got = dict.get(key);
+    if(got !== undefined){ prefix = got; continue; }
+    push(prefix);
+    if(next === 4096){
+      push(clear); dict = new Map(); next = eoi + 1; size = minCode + 1;
+    } else {
+      if(next >= (1<<size) && size < 12) size++;
+      dict.set(key, next); next++;
+    }
+    prefix = k;
+  }
+  push(prefix); push(eoi);
+  if(bits > 0) buf.push(cur & 255);
+  for(let i=0;i<buf.length;i+=255){
+    const chunk = buf.slice(i, i+255);
+    out.push(chunk.length); for(const b of chunk) out.push(b);
+  }
+  out.push(0);
+}
+function buildGif(frames, w, h, delayCs, pal, loop){
+  const out = [];
+  const b = v => out.push(v & 255);
+  const s = v => { out.push(v & 255); out.push((v>>8) & 255); };
+  for(const ch of 'GIF89a') b(ch.charCodeAt(0));
+  s(w); s(h);
+  b(0xF7); b(0); b(0);
+  for(let i=0;i<256;i++){
+    const c = pal[i] || [0,0,0];
+    b(c[0]); b(c[1]); b(c[2]);
+  }
+  b(0x21); b(0xFF); b(11);
+  for(const ch of 'NETSCAPE2.0') b(ch.charCodeAt(0));
+  b(3); b(1); s(loop); b(0);
+  for(const px of frames){
+    b(0x21); b(0xF9); b(4); b(0x04); s(delayCs); b(0); b(0);
+    b(0x2C); s(0); s(0); s(w); s(h); b(0);
+    b(8);
+    lzw(8, px, out);
+  }
+  b(0x3B);
+  return new Uint8Array(out);
+}
+async function exportGif(){
+  if(!S.frames.length) return;
+  const seq = sequence();
+  const d = outDims();
+  if(d.W*d.H > 4200000){ toast('That output is very large for a GIF — try a smaller width.'); }
+  const prog = openProgress('Building GIF', 'Rendering frames.');
+  await tick();
+  const cv = document.createElement('canvas'); cv.width = d.W; cv.height = d.H;
+  const c = cv.getContext('2d', {willReadFrequently:true});
+  const raw = [];
+  for(let i=0;i<seq.length;i++){
+    c.setTransform(1,0,0,1,0,0);
+    renderOut(c, d, seq[i]);
+    raw.push(c.getImageData(0,0,d.W,d.H).data);
+    prog.set(0.45*(i+1)/seq.length); await tick();
+  }
+  prog.msg('Choosing colours.'); await tick();
+  const P = paletteFor(raw, S.gif.colors);
+  const quant = [];
+  for(let i=0;i<raw.length;i++){
+    quant.push(quantize(raw[i], d.W, d.H, P, S.gif.dither));
+    prog.set(0.45 + 0.45*(i+1)/raw.length); await tick();
+  }
+  prog.msg('Packing.'); await tick();
+  const cs = Math.max(2, Math.round(S.play.ms/10));
+  const bytes = buildGif(quant, d.W, d.H, cs, P.pal, 0);
+  prog.close();
+  save(new Blob([bytes], {type:'image/gif'}), 'wigglegram.gif');
+  const real = cs*10;
+  if(Math.abs(real - S.play.ms) > 4) toast('Saved. GIF holds each frame ' + real + 'ms (the format works in 10ms steps).');
+}
+
+/* ================================================================
+   video export
+   ================================================================ */
+function pickMime(){
+  const t = ['video/mp4;codecs=avc1.42E01E','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+  for(const m of t){ if(window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m; }
+  return null;
+}
+async function exportVideo(){
+  if(!S.frames.length) return;
+  const mime = pickMime();
+  if(!mime){ toast('This browser can\u2019t record video. Try the GIF, or use Chrome.'); return; }
+  const d = outDims();
+  const seq = sequence();
+  const loopMs = seq.length * S.play.ms;
+  const loops = Math.max(1, Math.ceil(S.vidSec*1000 / loopMs));
+  const total = loops * loopMs;
+  const cv = document.createElement('canvas'); cv.width = d.W; cv.height = d.H;
+  const c = cv.getContext('2d');
+  renderOut(c, d, seq[0]);
+  const stream = cv.captureStream(60);
+  const rec = new MediaRecorder(stream, {mimeType: mime, videoBitsPerSecond: 12000000});
+  const chunks = [];
+  rec.ondataavailable = e => { if(e.data.size) chunks.push(e.data); };
+  const done = new Promise(r => rec.onstop = r);
+  const prog = openProgress('Recording video', 'Playing the loop ' + loops + '\u00d7 in real time.');
+  rec.start();
+  const t0 = performance.now();
+  let last = -1;
+  await new Promise(resolve => {
+    function step(){
+      const el = performance.now() - t0;
+      if(el >= total){ resolve(); return; }
+      const fi = Math.floor(el / S.play.ms) % seq.length;
+      if(fi !== last){
+        last = fi;
+        c.setTransform(1,0,0,1,0,0);
+        renderOut(c, d, seq[fi]);
+      }
+      prog.set(el/total);
+      requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  });
+  rec.stop();
+  await done;
+  prog.close();
+  const ext = mime.includes('mp4') ? 'mp4' : 'webm';
+  save(new Blob(chunks, {type: mime}), 'wigglegram.' + ext);
+  if(ext === 'webm') toast('Saved as WebM — this browser has no MP4 recorder. Chrome will give you MP4.');
+}
+async function exportPngs(){
+  if(!S.frames.length) return;
+  const d = outDims();
+  const cv = document.createElement('canvas'); cv.width = d.W; cv.height = d.H;
+  const c = cv.getContext('2d');
+  for(let i=0;i<S.order.length;i++){
+    c.setTransform(1,0,0,1,0,0);
+    renderOut(c, d, S.order[i]);
+    const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+    save(blob, 'wiggle-' + String(i+1).padStart(2,'0') + '.png');
+    await new Promise(r => setTimeout(r, 250));
+  }
+  toast('Saved ' + S.order.length + ' aligned frames.');
+}
+function save(blob, name){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 8000);
+}
+
+/* ================================================================
+   chrome: progress, toast
+   ================================================================ */
+function openProgress(title, msg){
+  const veil = document.createElement('div'); veil.className = 'veil';
+  veil.innerHTML = '<div class="card"><h3></h3><div class="bar"><i></i></div><p></p></div>';
+  veil.querySelector('h3').textContent = title;
+  veil.querySelector('p').textContent = msg;
+  document.body.appendChild(veil);
+  return {
+    set: v => veil.querySelector('.bar i').style.width = Math.round(clamp(v,0,1)*100) + '%',
+    msg: m => veil.querySelector('p').textContent = m,
+    close: () => veil.remove()
+  };
+}
+let toastT;
+function toast(msg, ms){
+  clearTimeout(toastT);
+  let el = document.querySelector('.toast');
+  if(!el){ el = document.createElement('div'); el.className = 'toast'; document.body.appendChild(el); }
+  el.textContent = msg;
+  toastT = setTimeout(()=>el.remove(), ms || 5200);
+}
+
+/* ================================================================
+   UI wiring
+   ================================================================ */
+function setTab(t){
+  S.tab = t;
+  ['align','crop','preview'].forEach(k => $('tab-'+k).setAttribute('aria-selected', String(k===t)));
+  $('alignSect').classList.toggle('hide', t !== 'align');
+  $('cropSect').classList.toggle('hide', t !== 'crop');
+  $('lookSect').classList.toggle('hide', t === 'align');
+  $('tabhint').textContent = t === 'align' ? 'wheel zooms \u00b7 space-drag pans \u00b7 arrows nudge \u00b7 1-9 pick frame'
+    : t === 'crop' ? 'drag the box or its corners \u00b7 wheel zooms'
+    : 'p pauses';
+  $('zoombar').classList.toggle('hide', t === 'preview');
+  if(t !== 'align'){ S.pinning = false; $('pinBtn').classList.remove('on'); stage.classList.remove('picking'); }
+  showCropSize();
+}
+$('tab-align').onclick = ()=>setTab('align');
+$('tab-crop').onclick = ()=>setTab('crop');
+$('tab-preview').onclick = ()=>setTab('preview');
+
+$('addBtn').onkeydown = e => {
+  if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); e.stopPropagation(); $('file').click(); }
+};
+$('file').onchange = e => { loadFiles(e.target.files); e.target.value = ''; };
+window.addEventListener('paste', e => {
+  const f = e.clipboardData && e.clipboardData.files;
+  if(f && f.length) loadFiles(f);
+});
+$('clearBtn').onclick = () => {
+  S.frames = []; S.order = []; S.pins = {}; S.crop = null;
+  $('cells').innerHTML = '';
+  $('empty').style.display = ''; $('empty').classList.add('on');
+  $('splitSect').classList.add('hide');
+  $('status').textContent = 'no frames loaded';
+  ctx.clearRect(0,0,stage.width,stage.height);
+};
+const drop = $('drop');
+['dragenter','dragover'].forEach(ev => window.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.add('hot');
+}));
+['dragleave','drop'].forEach(ev => window.addEventListener(ev, e => {
+  e.preventDefault();
+  if(ev === 'dragleave' && e.relatedTarget) return;
+  drop.classList.remove('hot');
+}));
+window.addEventListener('drop', e => { if(e.dataTransfer && e.dataTransfer.files.length) loadFiles(e.dataTransfer.files); });
+
+$('splitBtn').onclick = sliceStrip;
+bindRange('splitTrim','splitTrimV', v => v+'%');
+bindRange('splitGap','splitGapV', v => v+'%');
+
+document.querySelectorAll('#viewMode button').forEach(b => b.onclick = () => {
+  S.viewMode = b.dataset.v;
+  document.querySelectorAll('#viewMode button').forEach(x => x.setAttribute('aria-pressed', String(x===b)));
+});
+document.querySelectorAll('#seqMode button').forEach(b => b.onclick = () => {
+  S.play.ping = b.dataset.s === 'ping';
+  document.querySelectorAll('#seqMode button').forEach(x => x.setAttribute('aria-pressed', String(x===b)));
+});
+document.querySelectorAll('#ditherSeg button').forEach(b => b.onclick = () => {
+  S.gif.dither = b.dataset.d === '1';
+  document.querySelectorAll('#ditherSeg button').forEach(x => x.setAttribute('aria-pressed', String(x===b)));
+});
+document.querySelectorAll('[data-bc]').forEach(b => b.onclick = () => {
+  S.out.bc = b.dataset.bc; $('bc').value = b.dataset.bc;
+});
+
+function bindRange(id, out, fmt, onset){
+  const el = $(id);
+  el.addEventListener('input', () => {
+    const v = parseFloat(el.value);
+    if(out) $(out).textContent = fmt(v);
+    if(onset) onset(v);
+  });
+}
+bindRange('onion','onionV', v => v+'%', v => S.onion = v/100);
+bindRange('tx','txV', v => Math.round(v), v => { if(S.frames[S.active]){ S.frames[S.active].tx = v; refreshOffsets(); } });
+bindRange('ty','tyV', v => Math.round(v), v => { if(S.frames[S.active]){ S.frames[S.active].ty = v; refreshOffsets(); } });
+bindRange('rot','rotV', v => v.toFixed(2)+'\u00b0', v => { if(S.frames[S.active]) S.frames[S.active].rot = v; });
+bindRange('scl','sclV', v => v.toFixed(1)+'%', v => { if(S.frames[S.active]) S.frames[S.active].scale = v/100; });
+bindRange('ms','msV', v => v+'ms', v => S.play.ms = v);
+bindRange('bw','bwV', v => v+'%', v => { S.out.bw = v; showCropSize(); });
+bindRange('br','brV', v => v+'%', v => S.out.br = v);
+bindRange('gifColors','gifColorsV', v => String(v), v => S.gif.colors = v);
+bindRange('vidSec','vidSecV', v => v.toFixed(1)+'s', v => S.vidSec = v);
+
+$('bc').oninput = e => S.out.bc = e.target.value;
+$('outAspect').onchange = e => { S.out.aspect = parseFloat(e.target.value) || 0; showCropSize(); };
+$('outW').oninput = e => { S.out.w = clamp(parseInt(e.target.value)||900, 120, 4000); showCropSize(); };
+$('cropAspect').onchange = e => { S.cropAspect = parseFloat(e.target.value) || 0; applyCropAspect(); showCropSize(); };
+$('cropOverlap').onclick = cropOverlap;
+$('cropFull').onclick = resetCropFull;
+
+$('pinBtn').onclick = () => {
+  S.pinning = !S.pinning;
+  $('pinBtn').classList.toggle('on', S.pinning);
+  stage.classList.toggle('picking', S.pinning);
+  if(S.pinning){
+    S.pins = {}; S.active = S.ref; buildStrip(); syncUI();
+    toast('Click the same detail in every frame, starting with the reference.');
+  }
+};
+$('autoBtn').onclick = autoAlign;
+$('resetOne').onclick = () => {
+  const f = S.frames[S.active]; if(!f) return;
+  f.tx = 0; f.ty = 0; f.rot = 0; f.scale = 1;
+  delete S.pins[S.active];
+  syncSliders(); refreshOffsets();
+};
+$('revBtn').onclick = () => { S.order.reverse(); buildStrip(); };
+function togglePlay(){
+  S.play.on = !S.play.on;
+  if(!S.play.on) S._hold = nowIdx();
+  $('playBtn').textContent = S.play.on ? 'Pause' : 'Play';
+  $('playBtn').classList.toggle('on', S.play.on);
+}
+$('playBtn').onclick = togglePlay;
+$('gifBtn').onclick = exportGif;
+$('mp4Btn').onclick = exportVideo;
+$('pngBtn').onclick = exportPngs;
+$('panelToggle').onclick = () => $('side').classList.toggle('open');
+
+$('zIn').onclick = () => zoomTo(S.view.scale*1.3);
+$('zOut').onclick = () => zoomTo(S.view.scale/1.3);
+$('zOne').onclick = () => zoomTo(1);
+$('zLabel').onclick = () => fitView();
+
+function syncSliders(){
+  const f = S.frames[S.active]; if(!f) return;
+  const c = comp(), lim = Math.max(120, Math.round(Math.max(c.w,c.h)*0.35));
+  $('tx').min = -lim; $('tx').max = lim;
+  $('ty').min = -lim; $('ty').max = lim;
+  $('tx').value = clamp(f.tx,-lim,lim); $('txV').textContent = Math.round(f.tx);
+  $('ty').value = clamp(f.ty,-lim,lim); $('tyV').textContent = Math.round(f.ty);
+  $('rot').value = f.rot; $('rotV').textContent = f.rot.toFixed(2)+'\u00b0';
+  $('scl').value = f.scale*100; $('sclV').textContent = (f.scale*100).toFixed(1)+'%';
+}
+function syncUI(){
+  syncSliders(); showCropSize();
+  const n = S.frames.length;
+  const pos = S.order.indexOf(S.active) + 1;
+  $('status').textContent = n ? n + ' frames \u00b7 editing ' + pos + ' \u00b7 reference ' + (S.order.indexOf(S.ref)+1) : 'no frames loaded';
+}
+
+/* ================================================================
+   loop
+   ================================================================ */
+let lastBlink = 0;
+function raf(t){
+  if(S.viewMode === 'blink' && t - lastBlink > S.play.ms*3){ blinkOn = !blinkOn; lastBlink = t; }
+  drawStage();
+  requestAnimationFrame(raf);
+}
+window.addEventListener('resize', () => {
+  if(!S.frames.length){ sizeStage(); return; }
+  if(S.zoomed){ sizeStage(); clampView(); }
+  else fitView();
+});
+sizeStage();
+setTab('align');
+requestAnimationFrame(raf);
+</script>
+<script>
+"use strict";
+(function(){
+  const detectBtn = document.getElementById('detectBtn');
+  const startBtn = document.getElementById('startBtn');
+  const captureBtn = document.getElementById('captureBtn');
+  const statusEl = document.getElementById('camStatus');
+  const deviceListEl = document.getElementById('deviceList');
+  const camGrid = document.getElementById('camGrid');
+  const captureCanvas = document.getElementById('captureCanvas');
+
+  let detectedDevices = [];
+  let activeStreams = [];
+  let activeFeeds = [];
+
+  function log(msg){ statusEl.textContent = msg; }
+
+  function stopAllActiveStreams(){
+    activeStreams.forEach(s => s.getTracks().forEach(t => t.stop()));
+    activeStreams = [];
+  }
+
+  async function detect(){
+    detectBtn.disabled = true; startBtn.disabled = true;
+    log('Requesting camera permission...');
+    try{
+      const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      tempStream.getTracks().forEach(t => t.stop());
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      detectedDevices = devices.filter(d => d.kind === 'videoinput');
+      if(detectedDevices.length === 0){
+        log('No cameras found.');
+        deviceListEl.classList.remove('visible');
+        detectBtn.disabled = false;
+        return;
+      }
+      deviceListEl.innerHTML = '';
+      detectedDevices.forEach((dev,i) => {
+        const row = document.createElement('label');
+        row.className = 'device-row';
+        row.innerHTML = '<input type="checkbox" data-idx="'+i+'" checked><span>['+i+'] '+
+          (dev.label || '(no label) ' + dev.deviceId.slice(0,12))+'</span>';
+        deviceListEl.appendChild(row);
+      });
+      deviceListEl.classList.add('visible');
+      log('Found '+detectedDevices.length+' camera(s). Uncheck any to skip, then Start Selected.');
+      startBtn.disabled = false;
+    }catch(err){
+      log('Permission/setup error: '+err.name+' - '+err.message);
+    }finally{
       detectBtn.disabled = false;
+    }
+  }
+
+  async function startSelected(){
+    startBtn.disabled = true; detectBtn.disabled = true;
+    stopAllActiveStreams();
+    camGrid.innerHTML = '';
+    activeFeeds = [];
+    captureBtn.disabled = true;
+
+    const checked = Array.from(deviceListEl.querySelectorAll('input[type=checkbox]:checked'))
+      .map(cb => detectedDevices[parseInt(cb.dataset.idx,10)]);
+
+    if(checked.length === 0){
+      log('No cameras selected.');
+      startBtn.disabled = false; detectBtn.disabled = false;
       return;
     }
 
-    deviceListEl.innerHTML = '';
-    detectedDevices.forEach((dev, i) => {
-      const row = document.createElement('label');
-      row.className = 'device-row';
-      row.innerHTML = `
-        <input type="checkbox" data-idx="${i}" checked>
-        <span>[${i}] ${dev.label || '(no label) ' + dev.deviceId.slice(0, 12)}</span>
-      `;
-      deviceListEl.appendChild(row);
-    });
-    deviceListEl.classList.add('visible');
+    log('Starting '+checked.length+' selected camera(s)...');
+    let successCount = 0, errors = [];
 
-    log(`Found ${detectedDevices.length} camera(s). Uncheck any you don't want, then click "Start Selected Cameras".`);
-    startBtn.disabled = false;
+    for(let i=0;i<checked.length;i++){
+      const dev = checked[i];
+      const box = document.createElement('div');
+      box.className = 'cam-box';
+      const labelEl = document.createElement('div');
+      labelEl.className = 'cam-label';
+      labelEl.textContent = dev.label || dev.deviceId.slice(0,12);
+      box.appendChild(labelEl);
+      const video = document.createElement('video');
+      video.autoplay = true; video.playsInline = true; video.muted = true;
+      box.appendChild(video);
+      const thumbWrap = document.createElement('div');
+      thumbWrap.className = 'thumb-wrap';
+      box.appendChild(thumbWrap);
+      camGrid.appendChild(box);
 
-  } catch (err) {
-    log(`Permission/setup error: ${err.name} - ${err.message}`);
-  } finally {
-    detectBtn.disabled = false;
-  }
-}
-
-async function startSelected() {
-  startBtn.disabled = true;
-  detectBtn.disabled = true;
-
-  stopAllActiveStreams();
-  grid.innerHTML = '';
-
-  const checked = Array.from(deviceListEl.querySelectorAll('input[type=checkbox]:checked'))
-    .map(cb => detectedDevices[parseInt(cb.dataset.idx, 10)]);
-
-  if (checked.length === 0) {
-    log('No cameras selected. Check at least one box above.');
-    startBtn.disabled = false;
-    detectBtn.disabled = false;
-    return;
-  }
-
-  log(`Starting ${checked.length} selected camera(s)...`);
-
-  let successCount = 0;
-  let errors = [];
-
-  for (let i = 0; i < checked.length; i++) {
-    const dev = checked[i];
-    const box = document.createElement('div');
-    box.className = 'cam-box';
-
-    const labelEl = document.createElement('div');
-    labelEl.className = 'cam-label';
-    const labelSpan = document.createElement('span');
-    labelSpan.textContent = dev.label || dev.deviceId.slice(0, 12);
-    labelEl.appendChild(labelSpan);
-    box.appendChild(labelEl);
-
-    const video = document.createElement('video');
-    video.autoplay = true;
-    video.playsInline = true;
-    video.muted = true;
-    box.appendChild(video);
-
-    const controls = document.createElement('div');
-    controls.className = 'cam-controls';
-    const captureBtn = document.createElement('button');
-    captureBtn.textContent = '📷 Capture Photo';
-    captureBtn.className = 'secondary';
-    captureBtn.disabled = true;
-    controls.appendChild(captureBtn);
-    box.appendChild(controls);
-
-    const thumbWrap = document.createElement('div');
-    thumbWrap.className = 'thumb-wrap';
-    box.appendChild(thumbWrap);
-
-    grid.appendChild(box);
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          deviceId: { exact: dev.deviceId },
-          width: { ideal: 320 },
-          height: { ideal: 240 },
-          frameRate: { ideal: 15, max: 15 }
-        },
-        audio: false
-      });
-      video.srcObject = stream;
-      activeStreams.push(stream);
-      captureBtn.disabled = false;
-      successCount++;
-
-      captureBtn.addEventListener('click', () => {
-        capturePhoto(video, dev, thumbWrap);
-      });
-
-    } catch (err) {
-      labelSpan.textContent += ` — FAILED: ${err.name}`;
-      errors.push(`${dev.label || dev.deviceId.slice(0,12)}: ${err.name} - ${err.message}`);
+      try{
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            deviceId: { exact: dev.deviceId },
+            width: { ideal: 320 }, height: { ideal: 240 },
+            frameRate: { ideal: 15, max: 15 }
+          },
+          audio: false
+        });
+        video.srcObject = stream;
+        activeStreams.push(stream);
+        activeFeeds.push({ video, dev, thumbWrap });
+        successCount++;
+      }catch(err){
+        labelEl.textContent += ' \u2014 FAILED: '+err.name;
+        errors.push((dev.label||dev.deviceId.slice(0,12))+': '+err.name+' - '+err.message);
+      }
+      await new Promise(r => setTimeout(r, 400));
     }
 
-    // Give the driver a moment to settle before opening the next device —
-    // helps with identical-chipset UVC cameras sharing one USB controller.
-    await new Promise(r => setTimeout(r, 400));
+    let summary = successCount+'/'+checked.length+' camera(s) streaming.';
+    if(errors.length) summary += '\n\nErrors:\n'+errors.join('\n');
+    log(summary);
+    startBtn.disabled = false; detectBtn.disabled = false;
+    captureBtn.disabled = activeFeeds.length === 0;
   }
 
-  let summary = `${successCount}/${checked.length} camera(s) streaming.`;
-  if (errors.length) {
-    summary += '\n\nErrors:\n' + errors.join('\n');
+  function grabFrame(video, dev){
+    return new Promise(resolve => {
+      if(!video.videoWidth || !video.videoHeight){ resolve(null); return; }
+      captureCanvas.width = video.videoWidth;
+      captureCanvas.height = video.videoHeight;
+      const c = captureCanvas.getContext('2d');
+      c.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+      captureCanvas.toBlob(blob => {
+        if(!blob){ resolve(null); return; }
+        const stamp = new Date().toISOString().replace(/[:.]/g,'-');
+        const safeName = (dev.label || 'camera').replace(/[^a-z0-9]+/gi,'-').toLowerCase();
+        const filename = safeName+'-'+stamp+'.png';
+        resolve({ blob, filename });
+      }, 'image/png');
+    });
   }
-  log(summary);
 
-  startBtn.disabled = false;
-  detectBtn.disabled = false;
-}
+  async function captureAll(){
+    if(!activeFeeds.length) return;
+    captureBtn.disabled = true;
+    log('Capturing '+activeFeeds.length+' photo(s)...');
 
-function capturePhoto(video, dev, thumbWrap) {
-  if (!video.videoWidth || !video.videoHeight) return;
+    const files = [];
+    for(const feed of activeFeeds){
+      const shot = await grabFrame(feed.video, feed.dev);
+      if(!shot) continue;
+      const url = URL.createObjectURL(shot.blob);
+      feed.thumbWrap.innerHTML = '';
+      const img = document.createElement('img'); img.src = url;
+      const link = document.createElement('a'); link.href = url; link.download = shot.filename;
+      link.textContent = 'Download';
+      feed.thumbWrap.appendChild(img); feed.thumbWrap.appendChild(link);
+      feed.thumbWrap.classList.add('visible');
+      files.push(new File([shot.blob], shot.filename, { type: 'image/png' }));
+    }
 
-  captureCanvas.width = video.videoWidth;
-  captureCanvas.height = video.videoHeight;
-  const ctx = captureCanvas.getContext('2d');
-  ctx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+    if(files.length && typeof loadFiles === 'function'){
+      const clearBtn = document.getElementById('clearBtn');
+      if(clearBtn) clearBtn.click();
+      loadFiles(files);
+      log('Captured '+files.length+' photo(s) \u2192 sent to Wigglegram for processing.');
+    } else {
+      log('Captured '+files.length+' photo(s), but could not reach the Wigglegram side.');
+    }
+    captureBtn.disabled = false;
+  }
 
-  captureCanvas.toBlob((blob) => {
-    if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const safeName = (dev.label || 'camera').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
-    const filename = `${safeName}-${stamp}.png`;
-
-    thumbWrap.innerHTML = '';
-    const img = document.createElement('img');
-    img.src = url;
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.textContent = 'Download photo';
-    thumbWrap.appendChild(img);
-    thumbWrap.appendChild(link);
-    thumbWrap.classList.add('visible');
-  }, 'image/png');
-}
-
-detectBtn.addEventListener('click', detect);
-startBtn.addEventListener('click', startSelected);
+  detectBtn.addEventListener('click', detect);
+  startBtn.addEventListener('click', startSelected);
+  captureBtn.addEventListener('click', captureAll);
+})();
 </script>
 
 </body>
