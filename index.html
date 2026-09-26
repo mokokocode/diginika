@@ -125,7 +125,12 @@ async function start() {
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { deviceId: { exact: dev.deviceId } },
+          video: {
+            deviceId: { exact: dev.deviceId },
+            width: { ideal: 320 },
+            height: { ideal: 240 },
+            frameRate: { ideal: 15, max: 15 }
+          },
           audio: false
         });
         video.srcObject = stream;
@@ -134,6 +139,10 @@ async function start() {
         labelEl.textContent += ` — FAILED: ${err.name}`;
         errors.push(`Camera ${i} (${dev.label}): ${err.name} - ${err.message}`);
       }
+
+      // Give the driver a moment to settle before opening the next device —
+      // helps with identical-chipset UVC cameras sharing one USB controller.
+      await new Promise(r => setTimeout(r, 400));
     }
 
     let summary = `${successCount}/${videoInputs.length} camera(s) streaming simultaneously.`;
