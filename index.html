@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3-Camera USB Feed Test</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0;
+    background: #111;
+    color: #eee;
+    font-family: -apple-system, system-ui, sans-serif;
+    padding: 16px;
+  }
+  h1 { font-size: 1.1rem; margin: 0 0 4px; }
+  p.sub { margin: 0 0 16px; color: #999; font-size: 0.85rem; }
+  #status {
+    margin-bottom: 16px;
+    padding: 10px 12px;
+    background: #1c1c1c;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+  }
+  #grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  @media (min-width: 700px) {
+    #grid { grid-template-columns: 1fr 1fr; }
+  }
+  .cam-box {
+    background: #1c1c1c;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid #333;
+  }
+  .cam-label {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    color: #bbb;
+    border-bottom: 1px solid #333;
+  }
+  video {
+    width: 100%;
+    display: block;
+    background: #000;
+    aspect-ratio: 4/3;
+    object-fit: contain;
+  }
+  button {
+    background: #2d7dff;
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    margin-bottom: 16px;
+    cursor: pointer;
+  }
+  button:disabled { background: #444; }
+</style>
+</head>
+<body>
+
+<h1>USB Camera Feed Test</h1>
+<p class="sub">Plug your 3-camera dongle in, then tap Start. This just shows live feeds — no capture, no saving.</p>
+
+<button id="startBtn">Start Cameras</button>
+<div id="status">Not started yet.</div>
+<div id="grid"></div>
+
+<script>
+const startBtn = document.getElementById('startBtn');
+const statusEl = document.getElementById('status');
+const grid = document.getElementById('grid');
+
+function log(msg) {
+  statusEl.textContent = msg;
+}
+
+async function start() {
+  startBtn.disabled = true;
+  log('Requesting camera permission...');
+
+  try {
+    // Request permission once first — needed so enumerateDevices() returns
+    // labeled devices instead of blank ones on most browsers.
+    const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    tempStream.getTracks().forEach(t => t.stop());
+
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videoInputs = devices.filter(d => d.kind === 'videoinput');
+
+    log(`Found ${videoInputs.length} video input(s):\n` +
+        videoInputs.map((d, i) => `  [${i}] ${d.label || '(no label)'}`).join('\n'));
+
+    if (videoInputs.length === 0) {
+      log('No cameras found. Make sure the dongle is connected and cameras are recognized by the OS/browser.');
+      startBtn.disabled = false;
+      return;
+    }
+
+    grid.innerHTML = '';
+    let successCount = 0;
+    let errors = [];
+
+    for (let i = 0; i < videoInputs.length; i++) {
+      const dev = videoInputs[i];
+      const box = document.createElement('div');
+      box.className = 'cam-box';
+      const labelEl = document.createElement('div');
+      labelEl.className = 'cam-label';
+      labelEl.textContent = `Camera ${i}: ${dev.label || dev.deviceId.slice(0, 12)}`;
+      const video = document.createElement('video');
+      video.autoplay = true;
+      video.playsInline = true;
+      video.muted = true;
+      box.appendChild(labelEl);
+      box.appendChild(video);
+      grid.appendChild(box);
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: { exact: dev.deviceId } },
+          audio: false
+        });
+        video.srcObject = stream;
+        successCount++;
+      } catch (err) {
+        labelEl.textContent += ` — FAILED: ${err.name}`;
+        errors.push(`Camera ${i} (${dev.label}): ${err.name} - ${err.message}`);
+      }
+    }
+
+    let summary = `${successCount}/${videoInputs.length} camera(s) streaming simultaneously.`;
+    if (errors.length) {
+      summary += '\n\nErrors:\n' + errors.join('\n');
+    }
+    log(summary);
+
+  } catch (err) {
+    log(`Permission/setup error: ${err.name} - ${err.message}`);
+  } finally {
+    startBtn.disabled = false;
+  }
+}
+
+startBtn.addEventListener('click', start);
+</script>
+
+</body>
+</html>
