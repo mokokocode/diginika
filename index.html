@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>3-Camera USB Feed Test</title>
+<title>USB Camera Feed Test</title>
 <style>
   :root { color-scheme: dark; }
   body {
@@ -24,6 +24,24 @@
     line-height: 1.4;
     white-space: pre-wrap;
   }
+  #deviceList {
+    display: none;
+    background: #1c1c1c;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 16px;
+  }
+  #deviceList.visible { display: block; }
+  .device-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 0.85rem;
+    border-bottom: 1px solid #2a2a2a;
+  }
+  .device-row:last-child { border-bottom: none; }
+  .device-row input { width: 16px; height: 16px; }
   #grid {
     display: grid;
     grid-template-columns: 1fr;
@@ -43,7 +61,12 @@
     font-size: 0.8rem;
     color: #bbb;
     border-bottom: 1px solid #333;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
   }
+  .cam-label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   video {
     width: 100%;
     display: block;
@@ -51,6 +74,35 @@
     aspect-ratio: 4/3;
     object-fit: contain;
   }
+  .cam-controls {
+    display: flex;
+    gap: 8px;
+    padding: 8px 10px;
+    align-items: center;
+  }
+  .cam-controls button {
+    margin: 0;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+  }
+  .thumb-wrap {
+    padding: 0 10px 10px;
+    display: none;
+  }
+  .thumb-wrap.visible { display: flex; gap: 8px; align-items: center; }
+  .thumb-wrap img {
+    width: 64px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid #333;
+  }
+  .thumb-wrap a {
+    color: #6fa8ff;
+    font-size: 0.8rem;
+    text-decoration: none;
+  }
+  .thumb-wrap a:hover { text-decoration: underline; }
   button {
     background: #2d7dff;
     color: white;
@@ -61,28 +113,51 @@
     margin-bottom: 16px;
     cursor: pointer;
   }
-  button:disabled { background: #444; }
+  button:disabled { background: #444; cursor: default; }
+  button.secondary { background: #333; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
 </style>
 </head>
 <body>
 
 <h1>USB Camera Feed Test</h1>
-<p class="sub">Plug your 3-camera dongle in, then tap Start. This just shows live feeds — no capture, no saving.</p>
+<p class="sub">Detect cameras, pick which ones to use, start them, and grab a still photo from any feed.</p>
 
-<button id="startBtn">Start Cameras</button>
+<div class="btn-row">
+  <button id="detectBtn">Detect Cameras</button>
+  <button id="startBtn" disabled>Start Selected Cameras</button>
+</div>
+
 <div id="status">Not started yet.</div>
+
+<div id="deviceList"></div>
+
 <div id="grid"></div>
 
+<canvas id="captureCanvas" style="display:none;"></canvas>
+
 <script>
+const detectBtn = document.getElementById('detectBtn');
 const startBtn = document.getElementById('startBtn');
 const statusEl = document.getElementById('status');
+const deviceListEl = document.getElementById('deviceList');
 const grid = document.getElementById('grid');
+const captureCanvas = document.getElementById('captureCanvas');
+
+let detectedDevices = []; // [{deviceId, label}]
+let activeStreams = [];   // MediaStream objects currently open, so we can stop them on re-start
 
 function log(msg) {
   statusEl.textContent = msg;
 }
 
-async function start() {
+function stopAllActiveStreams() {
+  activeStreams.forEach(s => s.getTracks().forEach(t => t.stop()));
+  activeStreams = [];
+}
+
+async function detect() {
+  detectBtn.disabled = true;
   startBtn.disabled = true;
   log('Requesting camera permission...');
 
@@ -93,72 +168,161 @@ async function start() {
     tempStream.getTracks().forEach(t => t.stop());
 
     const devices = await navigator.mediaDevices.enumerateDevices();
-    const videoInputs = devices.filter(d => d.kind === 'videoinput');
+    detectedDevices = devices.filter(d => d.kind === 'videoinput');
 
-    log(`Found ${videoInputs.length} video input(s):\n` +
-        videoInputs.map((d, i) => `  [${i}] ${d.label || '(no label)'}`).join('\n'));
-
-    if (videoInputs.length === 0) {
-      log('No cameras found. Make sure the dongle is connected and cameras are recognized by the OS/browser.');
-      startBtn.disabled = false;
+    if (detectedDevices.length === 0) {
+      log('No cameras found. Make sure devices are connected and recognized by the OS/browser.');
+      deviceListEl.classList.remove('visible');
+      detectBtn.disabled = false;
       return;
     }
 
-    grid.innerHTML = '';
-    let successCount = 0;
-    let errors = [];
+    deviceListEl.innerHTML = '';
+    detectedDevices.forEach((dev, i) => {
+      const row = document.createElement('label');
+      row.className = 'device-row';
+      row.innerHTML = `
+        <input type="checkbox" data-idx="${i}" checked>
+        <span>[${i}] ${dev.label || '(no label) ' + dev.deviceId.slice(0, 12)}</span>
+      `;
+      deviceListEl.appendChild(row);
+    });
+    deviceListEl.classList.add('visible');
 
-    for (let i = 0; i < videoInputs.length; i++) {
-      const dev = videoInputs[i];
-      const box = document.createElement('div');
-      box.className = 'cam-box';
-      const labelEl = document.createElement('div');
-      labelEl.className = 'cam-label';
-      labelEl.textContent = `Camera ${i}: ${dev.label || dev.deviceId.slice(0, 12)}`;
-      const video = document.createElement('video');
-      video.autoplay = true;
-      video.playsInline = true;
-      video.muted = true;
-      box.appendChild(labelEl);
-      box.appendChild(video);
-      grid.appendChild(box);
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            deviceId: { exact: dev.deviceId },
-            width: { ideal: 320 },
-            height: { ideal: 240 },
-            frameRate: { ideal: 15, max: 15 }
-          },
-          audio: false
-        });
-        video.srcObject = stream;
-        successCount++;
-      } catch (err) {
-        labelEl.textContent += ` — FAILED: ${err.name}`;
-        errors.push(`Camera ${i} (${dev.label}): ${err.name} - ${err.message}`);
-      }
-
-      // Give the driver a moment to settle before opening the next device —
-      // helps with identical-chipset UVC cameras sharing one USB controller.
-      await new Promise(r => setTimeout(r, 400));
-    }
-
-    let summary = `${successCount}/${videoInputs.length} camera(s) streaming simultaneously.`;
-    if (errors.length) {
-      summary += '\n\nErrors:\n' + errors.join('\n');
-    }
-    log(summary);
+    log(`Found ${detectedDevices.length} camera(s). Uncheck any you don't want, then click "Start Selected Cameras".`);
+    startBtn.disabled = false;
 
   } catch (err) {
     log(`Permission/setup error: ${err.name} - ${err.message}`);
   } finally {
-    startBtn.disabled = false;
+    detectBtn.disabled = false;
   }
 }
 
-startBtn.addEventListener('click', start);
+async function startSelected() {
+  startBtn.disabled = true;
+  detectBtn.disabled = true;
+
+  stopAllActiveStreams();
+  grid.innerHTML = '';
+
+  const checked = Array.from(deviceListEl.querySelectorAll('input[type=checkbox]:checked'))
+    .map(cb => detectedDevices[parseInt(cb.dataset.idx, 10)]);
+
+  if (checked.length === 0) {
+    log('No cameras selected. Check at least one box above.');
+    startBtn.disabled = false;
+    detectBtn.disabled = false;
+    return;
+  }
+
+  log(`Starting ${checked.length} selected camera(s)...`);
+
+  let successCount = 0;
+  let errors = [];
+
+  for (let i = 0; i < checked.length; i++) {
+    const dev = checked[i];
+    const box = document.createElement('div');
+    box.className = 'cam-box';
+
+    const labelEl = document.createElement('div');
+    labelEl.className = 'cam-label';
+    const labelSpan = document.createElement('span');
+    labelSpan.textContent = dev.label || dev.deviceId.slice(0, 12);
+    labelEl.appendChild(labelSpan);
+    box.appendChild(labelEl);
+
+    const video = document.createElement('video');
+    video.autoplay = true;
+    video.playsInline = true;
+    video.muted = true;
+    box.appendChild(video);
+
+    const controls = document.createElement('div');
+    controls.className = 'cam-controls';
+    const captureBtn = document.createElement('button');
+    captureBtn.textContent = '📷 Capture Photo';
+    captureBtn.className = 'secondary';
+    captureBtn.disabled = true;
+    controls.appendChild(captureBtn);
+    box.appendChild(controls);
+
+    const thumbWrap = document.createElement('div');
+    thumbWrap.className = 'thumb-wrap';
+    box.appendChild(thumbWrap);
+
+    grid.appendChild(box);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          deviceId: { exact: dev.deviceId },
+          width: { ideal: 320 },
+          height: { ideal: 240 },
+          frameRate: { ideal: 15, max: 15 }
+        },
+        audio: false
+      });
+      video.srcObject = stream;
+      activeStreams.push(stream);
+      captureBtn.disabled = false;
+      successCount++;
+
+      captureBtn.addEventListener('click', () => {
+        capturePhoto(video, dev, thumbWrap);
+      });
+
+    } catch (err) {
+      labelSpan.textContent += ` — FAILED: ${err.name}`;
+      errors.push(`${dev.label || dev.deviceId.slice(0,12)}: ${err.name} - ${err.message}`);
+    }
+
+    // Give the driver a moment to settle before opening the next device —
+    // helps with identical-chipset UVC cameras sharing one USB controller.
+    await new Promise(r => setTimeout(r, 400));
+  }
+
+  let summary = `${successCount}/${checked.length} camera(s) streaming.`;
+  if (errors.length) {
+    summary += '\n\nErrors:\n' + errors.join('\n');
+  }
+  log(summary);
+
+  startBtn.disabled = false;
+  detectBtn.disabled = false;
+}
+
+function capturePhoto(video, dev, thumbWrap) {
+  if (!video.videoWidth || !video.videoHeight) return;
+
+  captureCanvas.width = video.videoWidth;
+  captureCanvas.height = video.videoHeight;
+  const ctx = captureCanvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+
+  captureCanvas.toBlob((blob) => {
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const safeName = (dev.label || 'camera').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+    const filename = `${safeName}-${stamp}.png`;
+
+    thumbWrap.innerHTML = '';
+    const img = document.createElement('img');
+    img.src = url;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.textContent = 'Download photo';
+    thumbWrap.appendChild(img);
+    thumbWrap.appendChild(link);
+    thumbWrap.classList.add('visible');
+  }, 'image/png');
+}
+
+detectBtn.addEventListener('click', detect);
+startBtn.addEventListener('click', startSelected);
 </script>
 
 </body>
