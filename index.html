@@ -294,6 +294,21 @@ body{display:flex}
     <span style="font-size:0.72rem;color:#999;">min</span>
     <span id="idleCountdown" style="font-size:0.72rem;color:#6fa8ff;margin-left:auto;"></span>
   </div>
+  <div class="btn-row" style="align-items:center;">
+    <label style="font-size:0.72rem;color:#999;display:flex;align-items:center;gap:4px;">
+      <input type="checkbox" id="portraitToggle" checked style="width:13px;height:13px;"> Portrait output
+    </label>
+  </div>
+  <div class="btn-row" style="align-items:center;">
+    <label style="font-size:0.72rem;color:#999;display:flex;align-items:center;gap:4px;">
+      <input type="checkbox" id="distortToggle" checked style="width:13px;height:13px;"> Lens correction (approx)
+    </label>
+  </div>
+  <div class="btn-row" style="align-items:center;" id="distortRow">
+    <input type="range" id="distortK1" min="-1" max="1" step="0.01" value="0.35" style="flex:1;">
+    <span id="distortK1V" style="font-size:0.68rem;color:#999;width:36px;text-align:right;">0.35</span>
+  </div>
+  <p class="sub" style="margin-top:-6px;font-size:0.66rem;">Not calibrated — nudge the slider until straight lines in frame look straight.</p>
   <div id="camStatus">Not started yet.</div>
   <div id="deviceList"></div>
   <div id="camGrid"></div>
@@ -1665,6 +1680,14 @@ requestAnimationFrame(raf);
   const captureCanvas = document.getElementById('captureCanvas');
   const idleMinutesEl = document.getElementById('idleMinutes');
   const idleCountdownEl = document.getElementById('idleCountdown');
+  const portraitToggle = document.getElementById('portraitToggle');
+  const distortToggle = document.getElementById('distortToggle');
+  const distortK1El = document.getElementById('distortK1');
+  const distortK1VEl = document.getElementById('distortK1V');
+  const distortRow = document.getElementById('distortRow');
+
+  distortK1El.addEventListener('input', () => { distortK1VEl.textContent = distortK1El.value; });
+  distortToggle.addEventListener('change', () => { distortRow.style.opacity = distortToggle.checked ? '1' : '0.35'; });
 
   let detectedDevices = [];
   let activeStreams = [];
@@ -1805,6 +1828,49 @@ requestAnimationFrame(raf);
     captureBtn.disabled = activeFeeds.length === 0;
   }
 
+  // Approximate radial (barrel) distortion correction. Not calibrated to any
+  // specific lens — k1 is a user-tuned fudge factor, not a measured
+  // coefficient. Positive k1 pulls edge content outward to counter the
+  // typical wide-angle/fisheye compression near the frame edges.
+  function applyDistortion(srcCanvas, k1){
+    const w = srcCanvas.width, h = srcCanvas.height;
+    const sctx = srcCanvas.getContext('2d');
+    const src = sctx.getImageData(0, 0, w, h);
+    const outCanvas = document.createElement('canvas');
+    outCanvas.width = w; outCanvas.height = h;
+    const octx = outCanvas.getContext('2d');
+    const dst = octx.createImageData(w, h);
+    const sd = src.data, dd = dst.data;
+    const cx = w / 2, cy = h / 2, norm = Math.min(w, h) / 2;
+    for(let y = 0; y < h; y++){
+      for(let x = 0; x < w; x++){
+        const nx = (x - cx) / norm, ny = (y - cy) / norm;
+        const scale = 1 + k1 * (nx*nx + ny*ny);
+        const sx = Math.round(cx + nx * scale * norm);
+        const sy = Math.round(cy + ny * scale * norm);
+        const di = (y*w + x) * 4;
+        if(sx >= 0 && sx < w && sy >= 0 && sy < h){
+          const si = (sy*w + sx) * 4;
+          dd[di] = sd[si]; dd[di+1] = sd[si+1]; dd[di+2] = sd[si+2]; dd[di+3] = sd[si+3];
+        }
+      }
+    }
+    octx.putImageData(dst, 0, 0);
+    return outCanvas;
+  }
+
+  // Rotates a canvas 90deg clockwise into a new canvas with swapped dimensions.
+  function rotate90(srcCanvas){
+    const w = srcCanvas.width, h = srcCanvas.height;
+    const outCanvas = document.createElement('canvas');
+    outCanvas.width = h; outCanvas.height = w;
+    const octx = outCanvas.getContext('2d');
+    octx.translate(outCanvas.width, 0);
+    octx.rotate(Math.PI / 2);
+    octx.drawImage(srcCanvas, 0, 0);
+    return outCanvas;
+  }
+
   function grabFrame(video, dev){
     return new Promise(resolve => {
       if(!video.videoWidth || !video.videoHeight){ resolve(null); return; }
@@ -1812,7 +1878,17 @@ requestAnimationFrame(raf);
       captureCanvas.height = video.videoHeight;
       const c = captureCanvas.getContext('2d');
       c.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
-      captureCanvas.toBlob(blob => {
+
+      let frameCanvas = captureCanvas;
+      if(distortToggle.checked){
+        const k1 = parseFloat(distortK1El.value) || 0;
+        if(k1 !== 0) frameCanvas = applyDistortion(frameCanvas, k1);
+      }
+      if(portraitToggle.checked){
+        frameCanvas = rotate90(frameCanvas);
+      }
+
+      frameCanvas.toBlob(blob => {
         if(!blob){ resolve(null); return; }
         const stamp = new Date().toISOString().replace(/[:.]/g,'-');
         const safeName = (dev.label || 'camera').replace(/[^a-z0-9]+/gi,'-').toLowerCase();
