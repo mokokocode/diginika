@@ -263,7 +263,8 @@ body{display:flex}
 .cam-box{background:#1c1c1c;border-radius:6px;overflow:hidden;border:1px solid #333}
 .cam-label{padding:3px 5px;font-size:0.62rem;color:#bbb;border-bottom:1px solid #333;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cam-box video{width:100%;display:block;background:#000;aspect-ratio:4/3;object-fit:cover}
+.video-frame{position:relative;overflow:hidden;background:#000;aspect-ratio:4/3}
+.video-frame video{position:absolute;top:50%;left:50%;object-fit:cover;transform-origin:center center;display:block;background:#000}
 .thumb-wrap{display:none;padding:5px;gap:5px;align-items:center}
 .thumb-wrap.visible{display:flex}
 .thumb-wrap img{width:36px;height:27px;object-fit:cover;border-radius:3px;border:1px solid #333}
@@ -303,10 +304,15 @@ body{display:flex}
     <span id="meterReadout" style="font-size:0.68rem;color:#6fa8ff;">center: &mdash;</span>
   </div>
   <div class="btn-row" style="align-items:center;">
-    <label style="font-size:0.72rem;color:#999;display:flex;align-items:center;gap:4px;">
-      <input type="checkbox" id="portraitToggle" checked style="width:13px;height:13px;"> Portrait output
-    </label>
+    <label for="rotateSelect" style="font-size:0.72rem;color:#999;">Rotate:</label>
+    <select id="rotateSelect" style="background:#1c1c1c;color:#eee;border:1px solid #333;border-radius:4px;padding:4px;font-size:0.72rem;">
+      <option value="0">0&deg; (sensor mounted landscape)</option>
+      <option value="90" selected>90&deg; CW</option>
+      <option value="180">180&deg;</option>
+      <option value="270">270&deg; CW (90&deg; CCW)</option>
+    </select>
   </div>
+  <p class="sub" style="margin-top:-4px;font-size:0.66rem;">Matches preview + captured output to however the module is physically mounted. If modules are mounted sideways, pick whichever value makes the live preview look upright &mdash; flip 90&deg;/270&deg; if it comes out rotated the wrong way.</p>
   <div class="btn-row" style="align-items:center;">
     <label style="font-size:0.72rem;color:#999;display:flex;align-items:center;gap:4px;">
       <input type="checkbox" id="distortToggle" checked style="width:13px;height:13px;"> Lens correction (approx)
@@ -1688,7 +1694,7 @@ requestAnimationFrame(raf);
   const captureCanvas = document.getElementById('captureCanvas');
   const idleMinutesEl = document.getElementById('idleMinutes');
   const idleCountdownEl = document.getElementById('idleCountdown');
-  const portraitToggle = document.getElementById('portraitToggle');
+  const rotateSelect = document.getElementById('rotateSelect');
   const distortToggle = document.getElementById('distortToggle');
   const distortK1El = document.getElementById('distortK1');
   const distortK1VEl = document.getElementById('distortK1V');
@@ -1699,6 +1705,36 @@ requestAnimationFrame(raf);
 
   const meterToggle = document.getElementById('meterToggle');
   const meterReadoutEl = document.getElementById('meterReadout');
+
+  /* ---------- preview rotation to match a physically-rotated module ----------
+     UVC sensors don't know their own mounting angle — rotating the module
+     just changes what orientation the scene lands in inside the same
+     landscape-shaped frame the driver reports. So the live preview needs
+     the same rotation applied as the captured output, or the viewfinder
+     will show the scene sideways even though the final photo comes out
+     upright. rotateSelect drives both, kept in sync so what you see while
+     framing a shot matches what gets saved. */
+  function layoutFeedPreview(feed){
+    const deg = parseInt(rotateSelect.value, 10) || 0;
+    const box = feed.frame, video = feed.video;
+    if(!box) return;
+    box.style.aspectRatio = (deg === 90 || deg === 270) ? '3 / 4' : '4 / 3';
+    requestAnimationFrame(() => {
+      const cw = box.clientWidth, ch = box.clientHeight;
+      if(!cw || !ch) return;
+      if(deg === 90 || deg === 270){
+        video.style.width = ch + 'px';
+        video.style.height = cw + 'px';
+      } else {
+        video.style.width = cw + 'px';
+        video.style.height = ch + 'px';
+      }
+      video.style.transform = 'translate(-50%,-50%) rotate(' + deg + 'deg)';
+    });
+  }
+  function layoutAllPreviews(){ activeFeeds.forEach(layoutFeedPreview); }
+  rotateSelect.addEventListener('change', layoutAllPreviews);
+  window.addEventListener('resize', layoutAllPreviews);
 
   let detectedDevices = [];
   let activeStreams = [];
@@ -1899,9 +1935,12 @@ requestAnimationFrame(raf);
       labelEl.className = 'cam-label';
       labelEl.textContent = dev.label || dev.deviceId.slice(0,12);
       box.appendChild(labelEl);
+      const frame = document.createElement('div');
+      frame.className = 'video-frame';
       const video = document.createElement('video');
       video.autoplay = true; video.playsInline = true; video.muted = true;
-      box.appendChild(video);
+      frame.appendChild(video);
+      box.appendChild(frame);
       const thumbWrap = document.createElement('div');
       thumbWrap.className = 'thumb-wrap';
       box.appendChild(thumbWrap);
@@ -1918,7 +1957,9 @@ requestAnimationFrame(raf);
         });
         video.srcObject = stream;
         activeStreams.push(stream);
-        activeFeeds.push({ video, dev, thumbWrap });
+        const feed = { video, dev, thumbWrap, frame, box };
+        activeFeeds.push(feed);
+        video.addEventListener('loadedmetadata', () => layoutFeedPreview(feed));
         successCount++;
       }catch(err){
         labelEl.textContent += ' \u2014 FAILED: '+err.name;
@@ -1965,14 +2006,25 @@ requestAnimationFrame(raf);
     return outCanvas;
   }
 
-  // Rotates a canvas 90deg clockwise into a new canvas with swapped dimensions.
-  function rotate90(srcCanvas){
+  // Rotates a canvas by 0/90/180/270 degrees clockwise into a new canvas
+  // (90/270 swap dimensions). Same angle drives the live preview
+  // (layoutFeedPreview) and the captured output, via rotateSelect.
+  function rotateCanvas(srcCanvas, deg){
+    deg = ((deg % 360) + 360) % 360;
+    if(deg === 0) return srcCanvas;
     const w = srcCanvas.width, h = srcCanvas.height;
     const outCanvas = document.createElement('canvas');
-    outCanvas.width = h; outCanvas.height = w;
     const octx = outCanvas.getContext('2d');
-    octx.translate(outCanvas.width, 0);
-    octx.rotate(Math.PI / 2);
+    if(deg === 180){
+      outCanvas.width = w; outCanvas.height = h;
+      octx.translate(w, h); octx.rotate(Math.PI);
+    } else if(deg === 90){
+      outCanvas.width = h; outCanvas.height = w;
+      octx.translate(outCanvas.width, 0); octx.rotate(Math.PI / 2);
+    } else { // 270
+      outCanvas.width = h; outCanvas.height = w;
+      octx.translate(0, outCanvas.height); octx.rotate(-Math.PI / 2);
+    }
     octx.drawImage(srcCanvas, 0, 0);
     return outCanvas;
   }
@@ -1990,8 +2042,9 @@ requestAnimationFrame(raf);
         const k1 = parseFloat(distortK1El.value) || 0;
         if(k1 !== 0) frameCanvas = applyDistortion(frameCanvas, k1);
       }
-      if(portraitToggle.checked){
-        frameCanvas = rotate90(frameCanvas);
+      const rotDeg = parseInt(rotateSelect.value, 10) || 0;
+      if(rotDeg !== 0){
+        frameCanvas = rotateCanvas(frameCanvas, rotDeg);
       }
 
       frameCanvas.toBlob(blob => {
