@@ -1743,22 +1743,36 @@ requestAnimationFrame(raf);
   let idleStopped = false;
 
   /* ---------- center-spot metering / auto exposure ----------
-     Reads the middle ~25% box of the reference feed (the first active
-     camera — same one used for the live viewfinder preview) and, if the
-     camera driver exposes manual exposure via the browser (Chromium on
-     Linux maps UVC's exposure_auto/exposure_absolute v4l2 controls to
-     this), nudges exposureTime toward a mid-gray target and mirrors the
-     same value onto every active feed so all four stay in sync. Cheap
-     UVC modules very often don't expose manual exposure to the browser
-     at all — in that case this still shows a live brightness readout,
-     just without being able to act on it. */
-  const METER_TARGET = 128;   // mid-gray target, 0-255
-  const METER_BOX = 0.25;     // fraction of frame width/height sampled, centered
+     Reads a center box of the reference feed (the first active camera —
+     same one used for the live viewfinder preview) and biases exposure
+     toward a mid-gray target there, mirroring the same control value
+     onto every active feed so all four stay in sync.
+
+     Two ways to actually influence exposure, tried in this order:
+       1. exposureCompensation — biases the camera's own auto-exposure
+          (its auto-gain/ISO keeps running). Preferred: less likely to
+          go dark, since it works with the camera's auto system rather
+          than replacing it.
+       2. exposureMode:'manual' + exposureTime — a blunter fallback.
+          This disables the camera's own auto-gain entirely, so even a
+          correctly-tuned exposure time can come out darker overall
+          than full auto was producing, because you lose whatever gain
+          boost auto mode was applying. Only used if compensation isn't
+          exposed.
+     Cheap UVC modules often expose neither to the browser at all — in
+     that case this still shows a live brightness readout, just without
+     being able to act on it. Raw getCapabilities() output for the
+     exposure-related fields is logged to the console the first time a
+     camera starts, so what the hardware actually supports can be
+     checked directly instead of guessed at. */
+  const METER_TARGET = 150;   // target luma, 0-255 (slightly above flat mid-gray —
+                               // matches faces/interiors a bit better than 128)
+  const METER_BOX = 0.4;      // fraction of frame width/height sampled, centered
   const METER_GAIN = 0.35;    // proportional control gain per tick
   const meterCanvas = document.createElement('canvas');
   meterCanvas.width = 32; meterCanvas.height = 32;
-  let exposureRange = undefined; // undefined = not probed yet, null = unsupported, {min,max,step} = supported
-  let currentExposureTime = null;
+  let control = undefined; // undefined = not probed, null = unsupported, {mode:'compensation'|'time', range:{min,max,step}}
+  let currentValue = null;
 
   function clampN(v,a,b){ return v < a ? a : v > b ? b : v; }
 
@@ -1780,19 +1794,29 @@ requestAnimationFrame(raf);
     return s ? s.getVideoTracks()[0] : null;
   }
 
-  async function probeExposureSupport(track){
+  async function probeExposureControl(track){
     try{
       const caps = track.getCapabilities ? track.getCapabilities() : null;
-      if(!caps || !caps.exposureMode || !caps.exposureMode.includes('manual') || !caps.exposureTime) return null;
-      return caps.exposureTime;
+      console.log('[wigglegram] camera capabilities', track.label, caps);
+      if(!caps) return null;
+      if(caps.exposureCompensation){
+        return { mode: 'compensation', range: caps.exposureCompensation };
+      }
+      if(caps.exposureMode && caps.exposureMode.includes('manual') && caps.exposureTime){
+        return { mode: 'time', range: caps.exposureTime };
+      }
+      return null;
     }catch(e){ return null; }
   }
 
-  async function applyExposureToAll(value){
+  async function applyControlToAll(mode, value){
     for(const feed of activeFeeds){
       const track = trackOf(feed);
       if(!track) continue;
-      try{ await track.applyConstraints({advanced:[{exposureMode:'manual', exposureTime: value}]}); }
+      const adv = mode === 'compensation'
+        ? { exposureCompensation: value }
+        : { exposureMode: 'manual', exposureTime: value };
+      try{ await track.applyConstraints({advanced:[adv]}); }
       catch(e){ /* this camera didn't accept it — leave it on its own auto exposure */ }
     }
   }
@@ -1808,30 +1832,37 @@ requestAnimationFrame(raf);
       return;
     }
 
-    if(exposureRange === undefined){
+    if(control === undefined){
       const track = trackOf(ref);
-      exposureRange = track ? await probeExposureSupport(track) : null;
-      if(exposureRange){
-        currentExposureTime = (exposureRange.min + exposureRange.max) / 2;
-        await applyExposureToAll(currentExposureTime);
+      control = track ? await probeExposureControl(track) : null;
+      if(control){
+        currentValue = (control.range.min + control.range.max) / 2;
+        await applyControlToAll(control.mode, currentValue);
       }
     }
 
-    if(!exposureRange){
-      meterReadoutEl.textContent = 'center: ' + Math.round(luma) + '/255 — this camera doesn’t expose manual exposure to the browser (readout only)';
+    if(!control){
+      meterReadoutEl.textContent = 'center: ' + Math.round(luma) + '/255 — this camera doesn’t expose exposure control to the browser (readout only — check console for its raw capabilities)';
       return;
     }
 
     const err = METER_TARGET / Math.max(1, luma);
-    let next = currentExposureTime * (1 + METER_GAIN * (err - 1));
-    const step = exposureRange.step || 1;
-    next = Math.round(next/step) * step;
-    next = clampN(next, exposureRange.min, exposureRange.max);
-    if(next !== currentExposureTime){
-      currentExposureTime = next;
-      await applyExposureToAll(currentExposureTime);
+    let next;
+    if(control.mode === 'compensation'){
+      const span = control.range.max - control.range.min;
+      next = currentValue + METER_GAIN * (err - 1) * span * 0.15;
+    } else {
+      next = currentValue * (1 + METER_GAIN * (err - 1));
     }
-    meterReadoutEl.textContent = 'center: ' + Math.round(luma) + '/255 — exposureTime ' + currentExposureTime;
+    const step = control.range.step || 1;
+    next = Math.round(next/step) * step;
+    next = clampN(next, control.range.min, control.range.max);
+    if(next !== currentValue){
+      currentValue = next;
+      await applyControlToAll(control.mode, currentValue);
+    }
+    meterReadoutEl.textContent = 'center: ' + Math.round(luma) + '/255 — ' +
+      (control.mode === 'compensation' ? 'exposureCompensation ' : 'exposureTime ') + currentValue;
   }
 
   setInterval(meterTick, 350);
@@ -1913,7 +1944,7 @@ requestAnimationFrame(raf);
     camGrid.innerHTML = '';
     activeFeeds = [];
     captureBtn.disabled = true;
-    exposureRange = undefined; currentExposureTime = null; // new tracks — reprobe exposure support
+    control = undefined; currentValue = null; // new tracks — reprobe exposure control
 
     const checked = Array.from(deviceListEl.querySelectorAll('input[type=checkbox]:checked'))
       .map(cb => detectedDevices[parseInt(cb.dataset.idx,10)]);
